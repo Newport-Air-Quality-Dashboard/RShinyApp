@@ -13,6 +13,30 @@ library(ggrepel)
 library(calendR)
 
 
+# Load data
+SensorDataDB <- read.csv("sensor_data_current.csv")
+SensorDataDBHistorical <- read.csv("sensor_data_historical.csv")
+
+SensorDataDB$Air_Quality_Index <- con2aqi("pm25", SensorDataDB$pm2.5_10minute)
+SensorDataDBHistorical$Air_Quality_Index <- con2aqi("pm25", SensorDataDBHistorical$pm2.5_10minute)
+SensorDataDB$Date <- as.POSIXct(SensorDataDB$last_seen, origin = "1970-01-01", tz = "UTC")
+SensorDataDBHistorical$Date <- as.POSIXct(SensorDataDBHistorical$last_seen, origin = "1970-01-01", tz = "UTC")
+
+SensorDataDBHistorical$Date_Only <- as.Date(SensorDataDBHistorical$Date)
+
+
+
+SensorDataDBHistorical <- SensorDataDBHistorical %>%
+  rename("Temperature_(f)" = temperature)
+
+SensorDataDB <- SensorDataDB %>%
+  rename("Temperature_(f)" = temperature)
+
+cutoff_date <- Sys.time() - days(3)
+SensorDataDB <- SensorDataDB %>%
+  filter(Date >= cutoff_date)
+
+
 #select the inputs
 
 getVarList <- function() {
@@ -311,7 +335,7 @@ ui <- dashboardPage(
                          width = NULL,
                          solidHeader = TRUE,
                          #status = "primary",
-                         "The two following graphs are here to visualize the Air Quality Index, which comprises of the density of pollutants of a certain size currently in the air. Anything above moderate is cause for concern. The graph on the left shows the current air quality as time ranges, and the graph on the right gives the daily average and shows it on a calendar."
+                         "The two following graphs are here to visualize the Air Quality Index, which comprises of the density of pollutants of a certain size currently in the air. Anything above moderate is cause for concern. The first graph shows the current air quality as time ranges, and the second graph gives the daily average and shows it on a calendar."
                        )
                 )
               ),
@@ -738,7 +762,23 @@ server <- function(input, output, session) {
   
   output$Calendar_Plot_Analyze <- renderPlot({
     
-    VariableFilter <- SensorDataDBHistorical %>%
+    
+    CurrentMonth = lubridate::month(Sys.Date())
+    CurrentYear = lubridate::year(Sys.Date())
+    
+    if (input$time_select_input_line_calendar_analyze == "month")
+    {
+      filtered_SensorDataDBHistorical <- SensorDataDBHistorical %>%
+        filter(year(Date_Only) == CurrentYear & month(Date_Only) == CurrentMonth)
+    }
+    else
+    {
+      filtered_SensorDataDBHistorical <- SensorDataDBHistorical %>%
+        filter(year(Date_Only) == CurrentYear)
+    }
+    
+    
+    VariableFilter <- filtered_SensorDataDBHistorical %>%
       group_by(sensor_index, Date_Only) %>%
       summarise(VariableFilter = mean(!!sym(input$variable_select_input_line_calendar_analyze), na.rm = TRUE))
     
@@ -769,8 +809,12 @@ server <- function(input, output, session) {
     color_text_mapping <- setNames(text_values, color_names)
     
     
+    
     if (input$time_select_input_line_calendar_analyze == "month")
     {
+      
+      
+      
       events <- rep(NA, lubridate::days_in_month(as.Date(Sys.Date())))
       
       events[filtered_data$Day_Number] <- as.character(sprintf("%04d", filtered_data$Day_Number))
@@ -781,7 +825,7 @@ server <- function(input, output, session) {
       
       
       #print(events[!sapply(events, is.na)])
-      p <- calendR(month = lubridate::month(Sys.Date()),  # May
+      p <- calendR(month = CurrentMonth,  # May
                    #year = 2025,
                    special.days = events,
                    special.col = adjustcolor(ordered_colors, alpha.f = 0.3),
@@ -1086,24 +1130,18 @@ server <- function(input, output, session) {
     filtered_data <- SensorDataDBHistorical %>%
       filter(name %in% all_sensors)
     
-    print(all_sensors)
-    
-    # Compute the average Air Quality Index (AQI) for each timestamp across all sensors
     avg_data <- filtered_data %>%
       group_by(Date_Only) %>%
-      summarise(Air_Quality_Index = mean(Air_Quality_Index))
+      summarise(across(everything(), ~ mean(.x, na.rm = TRUE)))#, .names = "avg_{.col}"))
     
     
-    
-    avg_data$Date <- as.POSIXct(avg_data$Date_Only, tz = "UTC")
-    
-    print(avg_data)
-    #dataset <- SensorDataDBHistorical[SensorDataDBHistorical$sensor_index == CurrentMapSensorId(), ]
-    
-    ggplot(avg_data, aes(x = Date, y = Air_Quality_Index)) +
-      geom_line() +
-      labs(x = "Date", y = "Average Air Quality Index", title = "Overall Average AQI")
-    #print(GraphPlot(avg_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index")))
+    tryCatch({
+      p <- GraphPlotMulti(filtered_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index"))
+      print(p)
+    }, error = function(e) {
+      print(paste("An error occurred:", e$message))
+      return(NA)
+    })
     
     
   })
@@ -1118,24 +1156,20 @@ server <- function(input, output, session) {
     filtered_data <- SensorDataDBHistorical %>%
       filter(name %in% all_sensors)
     
-    print(all_sensors)
+
     
-    # Compute the average Air Quality Index (AQI) for each timestamp across all sensors
     avg_data <- filtered_data %>%
       group_by(Date_Only) %>%
-      summarise(Air_Quality_Index = mean(Air_Quality_Index))
+      summarise(across(everything(), ~ mean(.x, na.rm = TRUE)))#, .names = "avg_{.col}"))
     
-    
-    
-    avg_data$Date <- as.POSIXct(avg_data$Date_Only, tz = "UTC")
-    
-    print(avg_data)
-    #dataset <- SensorDataDBHistorical[SensorDataDBHistorical$sensor_index == CurrentMapSensorId(), ]
-    
-    ggplot(avg_data, aes(x = Date, y = Air_Quality_Index)) +
-      geom_line() +
-      labs(x = "Date", y = "Average Air Quality Index", title = "Overall Average AQI")
-    #print(GraphPlot(avg_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index")))
+
+    tryCatch({
+      p <- GraphPlot(filtered_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index"))
+      print(p)
+    }, error = function(e) {
+      print(paste("An error occurred:", e$message))
+      return(NA)
+    })
     
     
   })
@@ -1160,7 +1194,88 @@ server <- function(input, output, session) {
   
   
   
-  
+  GraphPlotMulti <- function(dataset, start_date, end_date, background_bars)
+  {
+    
+    dataset <- dataset[dataset$Date >= start_date &
+                         dataset$Date <= end_date, ]
+    
+    start_date <- min(dataset$Date)
+    end_date <- max(dataset$Date)
+    
+    
+    #print(dataset[[input$variable_select_input_line_graph_analyze]]))
+    
+    #print(first(background_bars$var))
+    linecolor <- getColor(dataset[which.max(dataset$Date), first(background_bars$var)], first(background_bars$var))
+    
+    max_y_value <- max(dataset[[input$variable_select_input_line_graph_analyze]])
+    
+    # Set the y-axis limits dynamically
+    if (max_y_value > 101) {
+      p <- p + scale_y_continuous(limits = c(0, max_y_value))
+      scaletop <- max_y_value
+    } else {
+      p <- p + scale_y_continuous(limits = c(0, 101))
+      scaletop <- 101
+    }
+    
+    background_bars <- background_bars[background_bars$ymin <= scaletop - 6, ]
+    
+    end_points <- dataset %>%
+      group_by(name) %>%
+      filter(Date == max(Date)) %>%
+      ungroup()
+    
+    p <- ggplot() +
+      #adding on site markers make the graph too cluttered
+      #geom_label_repel(data = end_points, aes(x = Date, y = .data[[input$variable_select_input_line_graph_analyze]], label = name, color = name),
+      #                 fill = "#17171799", color = "black", 
+      #                 size = 5.5, fontface = "bold", vjust = 0.45, hjust = 0, show.legend = FALSE, segment.color = NA,
+      #                 box.padding = unit(0.2, "lines"), label.padding = unit(0.2, "lines"),
+      #                 label.r = 0.3, na.rm = TRUE, label.size=0) +
+      
+      geom_rect(data = background_bars, 
+                aes(xmin = start_date, xmax = end_date, ymin = ymin, ymax = ymax, fill = fill), 
+                color = NA, alpha = 0.08) +
+      scale_fill_identity() +
+      scale_x_datetime(labels = scales::time_format("%I %p\n%b %d"), breaks = pretty_breaks(n = 5)) +
+      
+      geom_line(data = dataset, aes(x = Date, y = .data[[input$variable_select_input_line_graph_analyze]], color = name), size = 0.7) +
+      #geom_line(data = dataset, aes(x = Date, y = .data[[first(background_bars$var)]]), color = linecolor, size = 1.5) + 
+      
+      
+      geom_hline(yintercept = background_bars$ymin, color = background_bars$fill, size = 0.5, na.rm = TRUE) +  # Make border lines thinner
+      geom_label_repel(aes(x = max(dataset$Date), y = background_bars$ymin + 4, label = background_bars$label),
+                       fill = "#17171799", color = background_bars$fill, 
+                       size = 5.5, fontface = "bold", vjust = 0.45, hjust = 0, show.legend = FALSE, segment.color = NA,
+                       box.padding = unit(0.2, "lines"), label.padding = unit(0.2, "lines"),
+                       label.r = 0.3, na.rm = TRUE, label.size=0) +
+      
+      
+      
+      labs(x = "Day", y = "") +
+      
+      ggtitle(paste("Current", gsub("_", " ", first(background_bars$var))))+
+      dark_theme() +
+      theme(
+        plot.title = element_text(face = "bold", size = 18),  # Make title bold
+        axis.title.x = element_text(face = "bold", size = 14),  # Make x-axis title bold and adjust size
+        #axis.title.y = element_text(face = "bold", size = 12),  # Make y-axis title bold and adjust size
+        axis.text.x = element_text(size = 11),
+        axis.text.y = element_text(face = "bold", size = 14),
+        #legend.position = "none",
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        
+        
+        legend.position = "bottom",  # Position legend at the bottom
+        legend.title = element_blank(),  # Remove legend title
+        legend.text = element_text(size = 14)  # Adjust legend text size
+      )
+    
+    return(p)
+  }
   
   
   
