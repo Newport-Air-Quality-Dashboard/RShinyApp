@@ -437,6 +437,10 @@ ui <- dashboardPage(
                 id = "listBoxes",
                 uiOutput("sensorList1UI"),
                 uiOutput("sensorList2UI")
+                ),
+                box(
+                  width = NULL, 
+                  checkboxInput("averageCheckboxCompare", "Average Values in Graph", value = FALSE)
                 )
               )
             )
@@ -445,7 +449,6 @@ ui <- dashboardPage(
             column(
               width = 6,
               box(
-                
                 title = "Sensor List One Line Graph", 
                 width = NULL, 
                 solidHeader = TRUE, 
@@ -1136,7 +1139,15 @@ server <- function(input, output, session) {
     
     
     tryCatch({
-      p <- GraphPlotMulti(filtered_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index"))
+      if(input$averageCheckboxCompare==TRUE)
+      {
+        p <- GraphPlot(filtered_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index"))
+      }
+      else
+      {
+        p <- GraphPlotMulti(filtered_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index"))
+      }
+      
       print(p)
     }, error = function(e) {
       print(paste("An error occurred:", e$message))
@@ -1164,13 +1175,20 @@ server <- function(input, output, session) {
     
 
     tryCatch({
-      p <- GraphPlot(filtered_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index"))
+      if(input$averageCheckboxCompare==TRUE)
+      {
+        p <- GraphPlot(filtered_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index"))
+      }
+      else
+      {
+        p <- GraphPlotMulti(filtered_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index"))
+      }
+      
       print(p)
     }, error = function(e) {
       print(paste("An error occurred:", e$message))
       return(NA)
     })
-    
     
   })
   
@@ -1190,6 +1208,7 @@ server <- function(input, output, session) {
     paste(gsub("_", " ", input$variable_select_input_line_calendar_analyze), "Calendar Plot")
     
   })
+  
   
   
   
