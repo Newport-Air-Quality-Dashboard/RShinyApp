@@ -1,0 +1,34 @@
+{
+    "type": [
+        2,
+        2,
+        0,
+        1,
+        3,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        0,
+        1,
+        2
+    ],
+    "data": [
+        "\nR version 4.3.3 (2024-02-29) -- \"Angel Food Cake\"\nCopyright (C) 2024 The R Foundation for Statistical Computing\nPlatform: x86_64-redhat-linux-gnu (64-bit)\n\nR is free software and comes with ABSOLUTELY NO WARRANTY.\nYou are welcome to redistribute it under certain conditions.\nType 'license()' or 'licence()' for distribution details.\n\n  Natural language support but running in an English locale\n\nR is a collaborative project with many contributors.\nType 'contributors()' for more information and\n'citation()' on ",
+        "how to cite R or R packages in publications.\n\nType 'demo()' for some demos, 'help()' for on-line help, or\n'help.start()' for an HTML browser interface to help.\nType 'q()' to quit R.\n\n[Workspace loaded from ~/Documents/AQShinyDemo/.RData]\n\n",
+        "> ",
+        "shiny::runApp()",
+        "Loading required package: shiny\n\nAttaching package: ‘shinydashboard’\n\nThe following object is masked from ‘package:graphics’:\n\n    box\n\n",
+        "── \u001B[1mAttaching core tidyverse packages\u001B[22m ─────────────────────────────────────── tidyverse 2.0.0 ──\n\u001B[32m✔\u001B[39m \u001B[34mdplyr    \u001B[39m 1.1.4     \u001B[32m✔\u001B[39m \u001B[34mreadr    \u001B[39m 2.1.5\n\u001B[32m✔\u001B[39m \u001B[34mforcats  \u001B[39m 1.0.0     \u001B[32m✔\u001B[39m \u001B[34mstringr  \u001B[39m 1.5.1\n\u001B[32m✔\u001B[39m \u001B[34mggplot2  \u001B[39m 3.5.1     \u001B[32m✔\u001B[39m \u001B[34mtibble   \u001B[39m 3.2.1\n\u001B[32m✔\u001B[39m \u001B[34mlubridate\u001B[39m 1.9.3     \u001B[32m✔\u001B[39m \u001B[34mtidyr ",
+        "   \u001B[39m 1.3.1\n\u001B[32m✔\u001B[39m \u001B[34mpurrr    \u001B[39m 1.0.2     \n── \u001B[1mConflicts\u001B[22m ───────────────────────────────────────────────────────── tidyverse_conflicts() ──\n\u001B[31m✖\u001B[39m \u001B[34mdplyr\u001B[39m::\u001B[32mfilter()\u001B[39m masks \u001B[34mstats\u001B[39m::filter()\n\u001B[31m✖\u001B[39m \u001B[34mdplyr\u001B[39m::\u001B[32mlag()\u001B[39m    masks \u001B[34mstats\u001B[39m::lag()\n\u001B[36mℹ\u001B[39m Use the \u001B]8;;http://conflicted.r-lib.org/\u0007conflict",
+        "ed package\u001B]8;;\u0007 to force all conflicts to become errors\n",
+        "The `name` provided ('clock-o') does not correspond to a known icon\nThe `name` provided ('clock-o') does not correspond to a known icon\n\nListening on http://127.0.0.1:5577\nWarning: Error in circle: could not find function \"circle\"\n  100: \u001B[34m\u001B[1mmakeCustomIcon [/home/xia/Documents/AQShinyDemo/app.R#62]\u001B[22m\u001B[39m\n   99: \u001B[37maddMarkers\u001B[39m\n   98: \u001B[37m%>%\u001B[39m\n   97: \u001B[34m\u001B[1m::\nhtmlwidgets\nshinyRenderWidget [/home/xia/Documents/AQShinyDemo/app.R#132]\u001B[22m\u001B[39m\n   96: \u001B[37mfunc\u001B[39m\n   83: \u001B[37mrenderFunc\u001B",
+        "[39m\n   82: \u001B[37moutput$AQMap\u001B[39m\n    1: \u001B[37mshiny::runApp\u001B[39m\n\nAttaching package: ‘gridSVG’\n\nThe following object is masked from ‘package:grDevices’:\n\n    dev.off\n\nThe `name` provided ('clock-o') does not correspond to a known icon\nThe `name` provided ('clock-o') does not correspond to a known icon\nWarning: Error in : 'grid_svg' is not an exported object from 'namespace:gridSVG'\n  100: \u001B[34m\u001B[1mmakeCustomIcon [/home/xia/Documents/AQShinyDemo/app.R#55]\u001B[22m\u001B[39m\n   99: \u001B[37maddMarkers\u001B[39m\n   98:",
+        " \u001B[37m%>%\u001B[39m\n   97: \u001B[34m\u001B[1m::\nhtmlwidgets\nshinyRenderWidget [/home/xia/Documents/AQShinyDemo/app.R#130]\u001B[22m\u001B[39m\n   96: \u001B[37mfunc\u001B[39m\n   83: \u001B[37mrenderFunc\u001B[39m\n   82: \u001B[37moutput$AQMap\u001B[39m\n    1: \u001B[37mshiny::runApp\u001B[39m\n\n",
+        "> ",
+        "install.packages(\"gridSVG\")",
+        "Error in install.packages : Updating loaded packages\n\nRestarting R session...\n\n"
+    ]
+}

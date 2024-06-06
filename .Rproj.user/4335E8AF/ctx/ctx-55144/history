@@ -1,0 +1,316 @@
+install.packages("shinydashboard")
+shiny::runApp()
+runApp()
+install.packages("maps")
+install.packages("maps")
+shiny::runApp()
+shiny::runApp()
+install.packages("wikidataQueryServiceR")
+install.packages("WikidataQueryServiceR")
+testdata <- data.frame(query_wikidata('SELECT DISTINCT ?ship ?coordinates ?canmore ?shipLabel WHERE{
+?ship wdt:P31 wd:Q852190 .
+?ship wdt:P625 ?coordinates .
+?ship wdt:P718 ?canmore .
+SERVICE wikibase:label{bd:serviceParam wikibase:language"[AUTO_LANGUAGE],en".}
+}'))
+source("~/Documents/AQShinyDemo/testr.R")
+source("~/Documents/AQShinyDemo/testr.R")
+view(testdata)
+source("~/Documents/AQShinyDemo/testr.R")
+source("~/Documents/AQShinyDemo/testr.R")
+source("~/Documents/AQShinyDemo/testr.R")
+source("~/Documents/AQShinyDemo/testr.R")
+testData<-seoerate(testdata, col = coordinates into=c("Longitude", "Latitude"), sep=" ")
+install.packages("tidyr")
+install.packages("tidyr")
+View(testdata)
+testdata <- data.frame(query_wikidata('SELECT DISTINCT ?ship ?coordinates ?canmore ?shipLabel WHERE{
+?ship wdt:P31 wd:Q852190 .
+?ship wdt:P625 ?coordinates .
+?ship wdt:P718 ?canmore .
+SERVICE wikibase:label{bd:serviceParam wikibase:language"[AUTO_LANGUAGE],en".}
+}'))
+source("~/Documents/AQShinyDemo/testr.R")
+testdata <- data.frame(query_wikidata('SELECT DISTINCT ?ship ?coordinates ?canmore ?shipLabel WHERE{
+?ship wdt:P31 wd:Q852190 .
+?ship wdt:P625 ?coordinates .
+?ship wdt:P718 ?canmore .
+SERVICE wikibase:label{bd:serviceParam wikibase:language"[AUTO_LANGUAGE],en".}
+}'))
+testdata <- data.frame(query_wikidata('SELECT DISTINCT ?ship ?coordinates ?canmore ?shipLabel WHERE{
+?ship wdt:P31 wd:Q852190 .
+?ship wdt:P625 ?coordinates .
+?ship wdt:P718 ?canmore .
+SERVICE wikibase:label{bd:serviceParam wikibase:language"[AUTO_LANGUAGE],en".}
+}'))
+install.packages("tidyr")
+install.packages("WikidataQueryServiceR")
+WikidataQueryServiceR
+testData<-seoerate(testdata, col = coordinates, into=c("Longitude", "Latitude"), sep=" ")
+source("~/Documents/AQShinyDemo/testr.R")
+source("~/Documents/AQShinyDemo/testr.R")
+source("~/Documents/AQShinyDemo/testr.R")
+testData<-separate(testdata, col = coordinates, into=c("Longitude", "Latitude"), sep=" ")
+source("~/Documents/AQShinyDemo/testr.R")
+testdata$Latitude<- as.numeric(testdata$Latitude)
+testdata$Longitude<- as.numeric(testdata$Longitude)
+View(testData)
+View(testData)
+View(testData)
+View(testData)
+source("~/Documents/AQShinyDemo/testr.R")
+dplyr
+install.packages("dplyr")
+install.packages("dplyr")
+source("~/Documents/AQShinyDemo/testr.R")
+source("~/Documents/AQShinyDemo/testr.R")
+testdata<-filter(testdata, Longitude>-2,Latitude>57, Latitude<57.5)
+shiny::runApp()
+install.packages("shinycssloaders")
+shiny::runApp()
+runApp()
+library(jsonlite)
+# Starting engine for PostgreSQL
+library(DBI)
+install.packages("DBI")
+install.packages("DBI")
+install.packages("jsonlite")
+install.packages(c("httr", "dplyr", "purrr", "readr", "jsonlite", "DBI", "RPostgreSQL"))
+jsonlite
+install.packages(c("httr", "dplyr", "purrr", "readr", "jsonlite", "DBI", "RPostgreSQL"))
+install.packages(c("httr", "dplyr", "purrr", "readr", "jsonlite", "DBI", "RPostgreSQL"))
+library(jsonlite)
+# Data download period
+bdate <- "2024-05-07T00:00:00+00:00"
+# writing to csv file
+folderpath <- "/home/xia/Documents/AQShinyDemo"
+folder
+# writing to csv file
+folderpath <- "/home/xia/Documents/AQShinyDemo"
+library(dplyr)
+library(readr)
+# Sleep Seconds
+sleep_seconds <- 3 # wait sleep_seconds after each query
+get_sensorslist <- function(nwlng, nwlat, selng, selat, location, key_read) {
+# PurpleAir API URL
+root_url <- "https://api.purpleair.com/v1/sensors/"
+# Box domain: lat_lon = [nwlng,, nwlat, selng, selat]
+lat_lon <- c(nwlng, nwlat, selng, selat)
+ll_api_url <- paste0("&nwlng=", lat_lon[1], "&nwlat=", lat_lon[2], "&selng=", lat_lon[3], "&selat=", lat_lon[4])
+# Fields to get
+fields_list <- c("sensor_index", "name", "latitude", "longitude", "location_type")
+fields_api_url <- paste0("&fields=", paste(fields_list, collapse = "%2C"))
+# Indoor, outdoor or all
+if (location == "indoor") {
+loc_api <- "&location_type=1"
+} else if (location == "outdoor") {
+loc_api <- "&location_type=0"
+} else {
+loc_api <- ""
+}
+# Final API URL
+api_url <- paste0(root_url, "?api_key=", key_read, fields_api_url, ll_api_url, loc_api)
+# Getting data
+response <- GET(api_url)
+if (status_code(response) == 200) {
+json_data <- content(response, as = "text") %>%
+fromJSON()
+df <- bind_cols(json_data$data)
+names(df) <- fields_list
+} else {
+stop("API request failed")
+}
+print("Sensors List Obtained Successfully")
+return(df)
+}
+source("~/Documents/AQShinyDemo/GrabPurpleAirData.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirData.R")
+# Data download period
+bdate <- "2024-05-07T00:00:00+00:00"
+source("~/Documents/AQShinyDemo/GrabPurpleAirData.R")
+# Average_time. The desired average in minutes, one of the following: 0 (real-time),
+#                  10 (default if not specified), 30, 60, 360 (6 hour), 1440 (1 day)
+average_time <- 60 # or 10  or 0 (Current script is set only for real-time, 10, or 60 minutes data)
+View(historical_data)
+View(historical_data)
+source("~/Documents/AQShinyDemo/GrabPurpleAirData.R")
+edate <- "2024-05-08T00:00:00+00:00"
+View(historical_data)
+source("~/Documents/AQShinyDemo/GrabPurpleAirData.R")
+# Getting PA data
+historical_data <- get_historicaldata(sensors_list, bdate, edate, average_time, key_read)
+source("~/Documents/AQShinyDemo/GrabPurpleAirData.R")
+# API Keys provided by PurpleAir(c)
+key_read <- "A8549CEC-0E06-11EF-B9F7-42010A80000D"
+source("~/Documents/AQShinyDemo/GrabPurpleAirData.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirData.R")
+View(sensors_list)
+View(historical_data)
+View(sensors_list)
+View(historical_data)
+View(sensors_list)
+source("~/Documents/AQShinyDemo/GrabPurpleAirData.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirData.R")
+# Data download period
+bdate <- "2024-05-06T00:00:00+00:00"
+edate <- "2024-05-07T00:00:00+00:00"
+source("~/Documents/AQShinyDemo/GrabPurpleAirData.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirData.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirData.R")
+shiny::runApp()
+View(sensors_list)
+View(sensors_list)
+View(sensors_list)
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+install.packages(httr)
+install.packages(httr)
+install.packages("httr")
+install.packages("httr")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+library(httr)
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+# Define the URL
+url <- "https://api.purpleair.com/v1/sensors/86529"
+# Define the API key
+api_key <- "A8549CEC-0E06-11EF-B9F7-42010A80000D"
+# Make the GET request with the API key in the headers
+response <- GET(url, add_headers("X-API-Key" = api_key))
+# Check the response status
+status_code(response)
+# Extract the content of the response
+content(response)
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+# Extract the content of the response
+content(response)
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+GET(url,
+add_headers("X-API-Key" = api_key),
+query = list(fields = fields))
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+# Check the response status
+status_code(response)
+# Extract the content of the response
+content(response)
+# Extract the content of the response
+content(response)
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+# Print the dataset
+print(sensor_data)
+View(sensor_data)
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+View(sensor_data)
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+# Write the result to a CSV file
+write.csv(result, "sensor_data.csv", row.names = FALSE)
+library(readr)
+sensor_data <- read_csv("sensor_data.csv")
+View(sensor_data)
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+# Define the URL
+url <- paste("https://api.purpleair.com/v1/sensors/", sensor)
+# Define the API key
+api_key <- "A8549CEC-0E06-11EF-B9F7-42010A80000D"
+# Define the fields you want to include in the response
+fields <- "sensor_index,latitude,longitude,humidity,temperature,pressure,pm2.5"
+# Make the GET request with the API key and specified fields
+response <- GET(url,
+add_headers("X-API-Key" = api_key),
+query = list(fields = fields))
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+for (sensor in sensorlist) {
+# Define the URL for each sensor inside the loop
+url <- paste("https://api.purpleair.com/v1/sensors/", sensor, sep = "")
+# Define the API key
+api_key <- "A8549CEC-0E06-11EF-B9F7-42010A80000D"
+# Define the fields you want to include in the response
+fields <- "sensor_index,latitude,longitude,humidity,temperature,pressure,pm2.5"
+# Make the GET request with the API key and specified fields
+response <- GET(url,
+add_headers("X-API-Key" = api_key),
+query = list(fields = fields))
+# Extract the content of the response
+result <- content(response)
+# Write the result to a CSV file
+write.csv(result, paste("sensor_data_", sensor, ".csv", sep = ""), row.names = FALSE)
+}
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+# Write the result to a CSV file
+write.csv(result, paste("sensor_data_", sensor, ".csv", sep = ""), row.names = FALSE)
+for (sensor in sensorlist) {
+# Define the URL for each sensor inside the loop
+url <- paste("https://api.purpleair.com/v1/sensors/", sensor, sep = "")
+# Define the API key
+api_key <- "A8549CEC-0E06-11EF-B9F7-42010A80000D"
+# Define the fields you want to include in the response
+fields <- "sensor_index,latitude,longitude,humidity,temperature,pressure,pm2.5"
+# Make the GET request with the API key and specified fields
+response <- GET(url,
+add_headers("X-API-Key" = api_key),
+query = list(fields = fields))
+# Extract the content of the response
+result <- content(response)
+# Write the result to a CSV file
+write.csv(result, paste("sensor_data_", sensor, ".csv", sep = ""), row.names = FALSE)
+}
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+# Write the combined data to a CSV file
+write.csv(combined_data, "combined_sensor_data.csv", row.names = FALSE)
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+# Combine all sensor data into one data frame
+combined_data <- do.call(rbind, all_sensor_data)
+# Write the combined data to a CSV file
+write.csv(combined_data, "combined_sensor_data.csv", row.names = FALSE)
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+while(TRUE) {
+sensors_list_table <- get_sensorslist(-84.534, 39.106, -84.455, 39.050, location, api_key)
+sensorlist <- c("86529")  # Use c() to create a vector instead of list
+# Create an empty list to store sensor data
+all_sensor_data <- list()
+for (sensor in sensorlist) {
+# Define the URL for each sensor inside the loop
+url <- paste("https://api.purpleair.com/v1/sensors/", sensor, sep = "")
+# Make the GET request with the API key and specified fields
+response <- GET(url,
+add_headers("X-API-Key" = api_key),
+query = list(fields = fields))
+# Extract the content of the response
+result <- content(response)
+# Append the sensor data to the list
+all_sensor_data[[sensor]] <- result
+}
+# Combine all sensor data into one data frame
+combined_data <- do.call(rbind, all_sensor_data)
+# Write the combined data to a CSV file
+write.csv(combined_data, "combined_sensor_data.csv", row.names = FALSE)
+Sys.sleep(600)
+}
+library(tidyverse)
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+while(TRUE) {
+get_sensorslist(-84.534, 39.106, -84.455, 39.050, location, api_key)
+Sys.sleep(600)
+}
+get_sensorsdata(-84.534, 39.106, -84.455, 39.050, location, api_key)
+source("~/Documents/AQShinyDemo/GrabPurpleAirDataV2.R")
+shiny::runApp()
+install.packages("gridSVG")

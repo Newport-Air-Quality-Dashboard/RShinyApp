@@ -1,0 +1,30 @@
+{
+    "type": [
+        0,
+        1,
+        3,
+        3,
+        3,
+        3,
+        0,
+        1,
+        3,
+        0,
+        1,
+        2
+    ],
+    "data": [
+        "> ",
+        "runApp()",
+        "\nListening on http://127.0.0.1:3622\nWarning: Error in paste: RAW() can only be applied to a 'raw', not a 'character'\n  103: \u001B[37mpaste\u001B[39m\n  102: \u001B[37mbase64enc::dataURI\u001B[39m\n  100: \u001B[34m\u001B[1mmakeCustomIcon [/home/xia/Documents/AQShinyDemo/app.R#57]\u001B[22m\u001B[39m\n   99: \u001B[37maddMarkers\u001B[39m\n   98: \u001B[37m%>%\u001B[39m\n   97: \u001B[34m\u001B[1m::\nhtmlwidgets\nshinyRenderWidget [/home/xia/Documents/AQShinyDemo/app.R#119]\u001B[22m\u001B[39m\n   96: \u001B[37mfunc\u001B[39m\n   83: \u001B[37mrenderFunc\u001B[39m\n   82: \u001B[37moutput$AQMap\u001B[39m\n    1: \u001B[37mrunApp\u001B[",
+        "39m\nWarning in file(what, \"rb\") :\n  cannot open file '<svg width=\"20\" height=\"20\" xmlns=\"http://www.w3.org/2000/svg\"><circle cx=\"10\" cy=\"10\" r=\"10\" fill=\"green\" /></svg>': No such file or directory\nWarning: Error in file: cannot open the connection\n  103: \u001B[37mfile\u001B[39m\n  102: \u001B[37mbase64enc::base64encode\u001B[39m\n  100: \u001B[34m\u001B[1mmakeCustomIcon [/home/xia/Documents/AQShinyDemo/app.R#57]\u001B[22m\u001B[39m\n   99: \u001B[37maddMarkers\u001B[39m\n   98: \u001B[37m%>%\u001B[39m\n   97: \u001B[34m\u001B[1m::\nhtmlwidgets\nshinyRenderWidget [/home/xia/Documen",
+        "ts/AQShinyDemo/app.R#119]\u001B[22m\u001B[39m\n   96: \u001B[37mfunc\u001B[39m\n   83: \u001B[37mrenderFunc\u001B[39m\n   82: \u001B[37moutput$AQMap\u001B[39m\n    1: \u001B[37mrunApp\u001B[39m\nWarning: Error in circle: could not find function \"circle\"\n  100: \u001B[34m\u001B[1mmakeCustomIcon [/home/xia/Documents/AQShinyDemo/app.R#62]\u001B[22m\u001B[39m\n   99: \u001B[37maddMarkers\u001B[39m\n   98: \u001B[37m%>%\u001B[39m\n   97: \u001B[34m\u001B[1m::\nhtmlwidgets\nshinyRenderWidget [/home/xia/Documents/AQShinyDemo/app.R#132]\u001B[22m\u001B[39m\n   96: \u001B[37mfunc\u001B[39m\n   83: \u001B[37mrenderFunc\u001B[39m\n   82: \u001B[37moutput$AQMap\u001B[3",
+        "9m\n    1: \u001B[37mrunApp\u001B[39m\n\n",
+        "> ",
+        "install.packages(\"svglite\"\\)",
+        "Error: unexpected '\\\\' in \"install.packages(\"svglite\"\\\"\n",
+        "> ",
+        "install.packages(\"svglite\")",
+        "Error in install.packages : Updating loaded packages\n\nRestarting R session...\n\n"
+    ]
+}
