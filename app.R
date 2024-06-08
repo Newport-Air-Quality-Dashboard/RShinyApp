@@ -11,6 +11,7 @@ library(con2aqi)
 library(reshape2)
 library(ggrepel)
 library(calendR)
+library(ggiraph)
 
 
 # Load data
@@ -458,7 +459,7 @@ ui <- dashboardPage(
                   column(
                     width = 12,
                     position = "relative",
-                    plotOutput("SensorListOneLinePlot")
+                    girafeOutput("SensorListOneLinePlot")
                   )
                 )
               )
@@ -467,17 +468,17 @@ ui <- dashboardPage(
             column(
               width = 6,
               box(
-                
                 title = "Sensor List Two Line Graph", 
                 width = NULL, 
                 solidHeader = TRUE, 
                 status = "warning",
                 style = "overflow: hidden;",  # Hide overflow to prevent unnecessary scrolling
+                height = "100%",  # Set the height of the box to 100% of its container
                 fluidRow(
                   column(
                     width = 12,
                     position = "relative",
-                    plotOutput("SensorListTwoLinePlot")
+                    girafeOutput("SensorListTwoLinePlot")  # Set the height of the plotly output to 100%
                   )
                 )
               )
@@ -1123,7 +1124,7 @@ server <- function(input, output, session) {
   })
   
   
-  output$SensorListOneLinePlot <- renderPlot({
+  output$SensorListOneLinePlot <- renderGirafe({
     
     start_date <- as.POSIXct(Sys.Date() - 7, tz = "UTC")
     end_date <- as.POSIXct(Sys.Date() + 1, tz = "UTC") - seconds(1)
@@ -1157,7 +1158,7 @@ server <- function(input, output, session) {
     
   })
   
-  output$SensorListTwoLinePlot <- renderPlot({
+  output$SensorListTwoLinePlot <- renderGirafe({
     
     start_date <- as.POSIXct(Sys.Date() - 7, tz = "UTC")
     end_date <- as.POSIXct(Sys.Date() + 1, tz = "UTC") - seconds(1)
@@ -1246,30 +1247,38 @@ server <- function(input, output, session) {
       filter(Date == max(Date)) %>%
       ungroup()
     
+    dataset <- dataset %>%
+      mutate(tooltip_label = as.character(glue::glue("{name}<br>{first(background_bars$var)}: {dataset[[first(background_bars$var)]]}<br>{Date_Only}")))
+               
+
+
+    
+    
     p <- ggplot() +
-      #adding on site markers make the graph too cluttered
-      #geom_label_repel(data = end_points, aes(x = Date, y = .data[[input$variable_select_input_line_graph_analyze]], label = name, color = name),
-      #                 fill = "#17171799", color = "black", 
-      #                 size = 5.5, fontface = "bold", vjust = 0.45, hjust = 0, show.legend = FALSE, segment.color = NA,
-      #                 box.padding = unit(0.2, "lines"), label.padding = unit(0.2, "lines"),
-      #                 label.r = 0.3, na.rm = TRUE, label.size=0) +
       
+
+    
       geom_rect(data = background_bars, 
-                aes(xmin = start_date, xmax = end_date, ymin = ymin, ymax = ymax, fill = fill), 
+                aes(xmin = start_date, xmax = end_date, ymin = ymin, ymax = ymax, fill = fill, text = label), 
                 color = NA, alpha = 0.08) +
       scale_fill_identity() +
       scale_x_datetime(labels = scales::time_format("%I %p\n%b %d"), breaks = pretty_breaks(n = 5)) +
       
-      geom_line(data = dataset, aes(x = Date, y = .data[[input$variable_select_input_line_graph_analyze]], color = name), size = 0.7) +
-      #geom_line(data = dataset, aes(x = Date, y = .data[[first(background_bars$var)]]), color = linecolor, size = 1.5) + 
+ 
+      geom_line_interactive(data = dataset, aes(x = Date, y = .data[[first(background_bars$var)]], color = name, data_id = sensor_index), 
+                            size = 1.4, alpha = 1) +
       
+      geom_point_interactive(data = dataset, aes(x = Date, y = .data[[first(background_bars$var)]], color = name, 
+                                                tooltip = tooltip_label, data_id = sensor_index), 
+                            size = 1.7, alpha = 0.4) +
       
       geom_hline(yintercept = background_bars$ymin, color = background_bars$fill, size = 0.5, na.rm = TRUE) +  # Make border lines thinner
-      geom_label_repel(aes(x = max(dataset$Date), y = background_bars$ymin + 4, label = background_bars$label),
-                       fill = "#17171799", color = background_bars$fill, 
-                       size = 5.5, fontface = "bold", vjust = 0.45, hjust = 0, show.legend = FALSE, segment.color = NA,
-                       box.padding = unit(0.2, "lines"), label.padding = unit(0.2, "lines"),
-                       label.r = 0.3, na.rm = TRUE, label.size=0) +
+      
+     geom_label_repel(aes(x = max(dataset$Date), y = background_bars$ymin, label = background_bars$label),
+                      fill = "#171717", color = background_bars$fill, 
+                      size = 3.5, fontface = "bold", vjust = 0.5, hjust = 0, show.legend = FALSE, segment.color = NA,
+                      box.padding = unit(0.2, "lines"), label.padding = unit(0.2, "lines"),
+                      label.r = 0.3, na.rm = TRUE, label.size=0) +
       
       
       
@@ -1288,14 +1297,25 @@ server <- function(input, output, session) {
         panel.grid.minor = element_blank(),
         
         
-        legend.position = "bottom",  # Position legend at the bottom
+        #legend.position = "bottom",  # Position legend at the bottom
         legend.title = element_blank(),  # Remove legend title
-        legend.text = element_text(size = 14)  # Adjust legend text size
+        legend.text = element_text(size = 7),  # Adjust legend text size
+        legend.position = c(.05, .95),
+        legend.justification = c("left", "top"),
+        legend.box.just = "left",
+        legend.margin = margin(3, 3, 3, 3),
+        legend.background = element_rect(fill = alpha("#000000", 0.4))
       )
     
-    return(p)
+    t <- girafe(ggobj = p, options = list(
+      opts_hover(css = "stroke-width:3; opacity: 1;"),
+      opts_hover_inv(css = "opacity: 0.1;"),
+      opts_tooltip(css = "background-color: rgba(0, 0, 0, 0.8); color: white; border-radius: 5px; padding: 5px;"),
+      opts_selection(type = "none")
+    ))
+    
+    return(t)
   }
-  
   
   
   

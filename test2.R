@@ -106,3 +106,100 @@ calendar_plot <- Cal %>%
 # Print the calendar plot
 print(calendar_plot)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#plotly code
+
+#p <- ggplotly(p, tooltip = "text")
+p <- ggplotly(p, tooltip = "text")
+
+# Add hover styling to the lines
+for (i in 1:length(p$x$data)) {
+  if (p$x$data[[i]]$name == "lines") {
+    p$x$data[[i]]$hoverinfo <- "text"
+    p$x$data[[i]]$hoveron <- "plot"
+    p$x$data[[i]]$line$width <- 10
+  }
+}
+
+# Add annotations
+annotations <- list()
+for (i in 1:nrow(background_bars)) {
+  annotations <- c(annotations, list(
+    list(
+      x = as.numeric(max(dataset$Date))- 60000,
+      y = background_bars$ymin[i] + 4,
+      text = background_bars$label[i],
+      xref = 'x',
+      yref = 'y',
+      showarrow = FALSE,
+      font = list(
+        size = 19,
+        color = background_bars$fill[i],
+        family = 'Arial'
+      ),
+      align = 'right',
+      valign = 'middle',
+      bgcolor = "#17171799",
+      borderpad = 4,
+      bordercolor = NA,
+      borderwidth = 0
+    )
+  ))
+}
+
+
+
+# Set legend to only include sensor names
+p <- p %>% layout(
+  annotations = annotations,
+  legend = list(
+    x = 0.5,
+    y = -0.3,  # Adjust the y value to move the legend outside the plot area
+    xanchor = 'center',
+    yanchor = 'top',
+    orientation = 'h',
+    traceorder = 'normal',
+    bgcolor = 'rgba(255, 255, 255, 0)',  # Set background color to transparent
+    bordercolor = 'rgba(255, 255, 255, 0)',  # Set border color to transparent
+    title = list(text = "")
+  )
+)
+
+
+
+# Ensure only sensor names are shown in the legend
+#sensor_names <- unique(dataset$name)
+#print(sensor_names)
+#print(p$layout$legend$traceorder)
+
+
+
+#rows = ceiling(length(sensor_names)/3)
+
+#print(rows)
+#p <- p %>% layout(
+#  height = 400 + rows * 100
+#)
+#for (trace in seq_along(p$data)) {
+#  if (p$data[[trace]]$name == "Background") {
+##    p$data[[trace]]$hoverinfo <- "none"
+#  }
+#}
+htmlwidgets::saveWidget(config(p, displayModeBar = FALSE), "graph.html")
+
+p <- p %>% layout(showlegend = FALSE)#, hovermode = "x unified", font = list(color = "white"))

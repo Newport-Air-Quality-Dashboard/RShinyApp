@@ -11,8 +11,8 @@ add a y axis label like "pollution level"
 
 make the two graphs share memory
 
+the legend starts going off the graph
 
-data frim last month bleeding into calendar plot
-
- 
 GroundWork and MSD 6 error out when graphed with the fanccy graph
+
+consult josh!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
