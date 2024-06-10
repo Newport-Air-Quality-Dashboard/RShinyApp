@@ -20,3 +20,5 @@ consult josh!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 make plot fill up in analyze portion
 
 botavia is same name for purpleair and epa monitor, fix
+
+show time on graph iffor 3 days
