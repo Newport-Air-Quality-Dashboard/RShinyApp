@@ -63,7 +63,7 @@ sensordata <- get_sensorsdata(-84.700, 39.233, -84.300, 38.996, location, api_ke
 write.csv(sensordata, "sensor_data_current.csv", row.names = FALSE)
 
 #quirk to be fixed, if you add a new field to be grabbed by the api sensordatahistorical will not add it unless it is reset
-append_to_historical(sensordata, "sensor_data_historical.csv")
+#append_to_historical(sensordata, "sensor_data_historical.csv")
 Sys.sleep(600)
 
 }

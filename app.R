@@ -13,31 +13,73 @@ library(ggrepel)
 library(calendR)
 library(ggiraph)
 
+calculate_aqi_pm25 <- function(pm25) {
+  breakpoints <- data.frame(
+    C_low = c(0, 12.1, 35.5, 55.5, 150.5, 250.5, 350.5),
+    C_high = c(12, 35.4, 55.4, 150.4, 250.4, 350.4, 500.4),
+    AQI_low = c(0, 51, 101, 151, 201, 301, 401),
+    AQI_high = c(50, 100, 150, 200, 300, 400, 500)
+  )
+  
+  #if (pm25 > tail(breakpoints$C_high, 1)) {
+  #  stop("Please confirm that the unit of PM2.5 is microgram per cubic meter!")
+  #}
+  
+  rank <- which(pm25 <= breakpoints$C_high)[1]
+  
+  aqi <- ceiling((breakpoints$AQI_high[rank] - breakpoints$AQI_low[rank]) / 
+                   (breakpoints$C_high[rank] - breakpoints$C_low[rank]) * 
+                   (pm25 - breakpoints$C_low[rank]) + breakpoints$AQI_low[rank])
+  
+  return(aqi)
+}
 
 # Load data
-SensorDataDB <- read.csv("sensor_data_current.csv")
-SensorDataDBHistorical <- read.csv("sensor_data_historical.csv")
+#SensorDataDB <- read.csv("sensor_data_current.csv")
+#SensorDataDB$Air_Quality_Index <- con2aqi("pm25", SensorDataDB$pm2.5_10minute)
+#SensorDataDB$Date <- as.POSIXct(SensorDataDB$last_seen, origin = "1970-01-01", tz = "UTC")
 
-SensorDataDB$Air_Quality_Index <- con2aqi("pm25", SensorDataDB$pm2.5_10minute)
-SensorDataDBHistorical$Air_Quality_Index <- con2aqi("pm25", SensorDataDBHistorical$pm2.5_10minute)
-SensorDataDB$Date <- as.POSIXct(SensorDataDB$last_seen, origin = "1970-01-01", tz = "UTC")
-SensorDataDBHistorical$Date <- as.POSIXct(SensorDataDBHistorical$last_seen, origin = "1970-01-01", tz = "UTC")
+
+#SensorDataDBHistorical <- read.csv("sensor_data_historical.csv")
+#SensorDataDBHistorical$Air_Quality_Index <- con2aqi("pm25", SensorDataDBHistorical$pm2.5_10minute)
+#SensorDataDBHistorical$Date <- as.POSIXct(SensorDataDBHistorical$last_seen, origin = "1970-01-01", tz = "UTC")
+#SensorDataDBHistorical$Date_Only <- as.Date(SensorDataDBHistorical$Date)
+SensorDataDBHistorical <- data.frame(
+  name = combined_data$name,
+  sensor_index = combined_data$sensor_index,
+  Date = combined_data$time_stamp,
+  #pm2.5_60minute = combined_data$pm2.5_60minute,
+  temperature = combined_data$temperature_60minute,
+  #pm2.5_60minute = ifelse(combined_data$source == "EPA", combined_data$pm2.5_atm, combined_data$pm2.5_60minute),
+  pm2.5_60minute = ifelse(combined_data$source == "EPA", combined_data$pm2.5_atm, combined_data$pm2.5_60minute),
+  
+  
+  
+  latitude = combined_data$latitude,
+  longitude = combined_data$longitude,
+  source = combined_data$source
+)
 
 SensorDataDBHistorical$Date_Only <- as.Date(SensorDataDBHistorical$Date)
-
-
-
+SensorDataDBHistorical <- subset(SensorDataDBHistorical, !is.na(pm2.5_60minute))
+SensorDataDBHistorical$Air_Quality_Index <- calculate_aqi_pm25(SensorDataDBHistorical$pm2.5_60minute)
 SensorDataDBHistorical <- SensorDataDBHistorical %>%
   rename("Temperature_(f)" = temperature)
 
-SensorDataDB <- SensorDataDB %>%
-  rename("Temperature_(f)" = temperature)
 
-cutoff_date <- Sys.time() - days(3)
+SensorDataDB <- SensorDataDBHistorical %>%
+  arrange(sensor_index, desc(Date)) %>%
+  group_by(sensor_index) %>%
+  slice(1) %>%
+  ungroup()
+
+
+#cutoff
+cutoff_date <- Sys.time() - days(40)
 SensorDataDB <- SensorDataDB %>%
   filter(Date >= cutoff_date)
 
-
+view(SensorDataDB)
 #select the inputs
 
 getVarList <- function() {
@@ -270,7 +312,7 @@ ui <- dashboardPage(
                   position = "relative",
                   div(id = "AQMapContainer", leafletOutput("AQMap")),
                   tags$div(id = "draggableContainer",
-                           plotOutput("plotInfo", height = "300px", width = "325px"),
+                           girafeOutput("plotInfo", height = "300px", width = "325px"),
                            actionButton("go_to_analyze", "See Details", style = "margin-top: 0px;")
                   )
                 ),
@@ -344,7 +386,7 @@ ui <- dashboardPage(
                 column(width = 6,
                        box(
                          title = uiOutput("LineGraphTitle"), width = NULL, solidHeader = TRUE, status = "primary",
-                         plotOutput("Line_Graph_Analyze", 
+                         girafeOutput("Line_Graph_Analyze", 
                                     
                                     
                          )
@@ -518,9 +560,11 @@ server <- function(input, output, session) {
   
   
   twentyFourHourGraph <- function(dataset){
+    #cutoff
+    #print(dataset)
     CurrentMapSensorId(first(dataset$sensor_index))
     #print(dataset)
-    start_date <- as.POSIXct(Sys.Date() - 3, tz = "UTC")
+    start_date <- as.POSIXct(Sys.Date() - 40, tz = "UTC")
     end_date <- as.POSIXct(Sys.Date() + 1, tz = "UTC") - seconds(1)
     
     tryCatch({
@@ -533,7 +577,7 @@ server <- function(input, output, session) {
     
     
     
-    output$plotInfo <- renderPlot({
+    output$plotInfo <- renderGirafe({
       p
     })
     
@@ -549,7 +593,7 @@ server <- function(input, output, session) {
         stroke = TRUE, 
         fillOpacity = 0.85,
         group = "markers2",
-        radius = 17, # Increase radius on hover
+        radius = if(dataset$source=="PurpleAir"){17}else{27}, # Increase radius on hover
         color = getColor(dataset[[input$variable_select_input_map]], input$variable_select_input_map)
       )
   }
@@ -563,11 +607,18 @@ server <- function(input, output, session) {
     FilteredSensorDataDB <- SensorDataDB %>%
       filter(!is.na(.[[input$variable_select_input_map]]))
     
+    EPA_data <- FilteredSensorDataDB %>% filter(source == "EPA")
+    
+
+    PurpleAir_data <- FilteredSensorDataDB %>% filter(source != "EPA")
     
     
     leaflet(FilteredSensorDataDB) %>%
       addProviderTiles(provider = providers$CartoDB.DarkMatter) %>%
+      
+      
       addCircleMarkers(
+        data = PurpleAir_data,
         lng = ~longitude,
         lat = ~latitude,
         color = getColor(TargetDataMap(), input$variable_select_input_map),
@@ -577,7 +628,21 @@ server <- function(input, output, session) {
         
         
       ) %>%
+      
+      addCircleMarkers(
+        data = EPA_data,
+        lng = ~longitude,
+        lat = ~latitude,
+        color = getColor(TargetDataMap(), input$variable_select_input_map),
+        radius = 25,
+        stroke = FALSE, 
+        fillOpacity = 0.85,
+        
+        
+      ) %>%
+      
       addLabelOnlyMarkers(
+        data = FilteredSensorDataDB,
         lng = ~longitude,
         lat = ~latitude,
         label = TargetDataMap(),
@@ -622,7 +687,7 @@ server <- function(input, output, session) {
   observe({
     zoom <- input$AQMap_zoom
     if (!is.null(zoom)) {
-      if (zoom < 13) {
+      if (zoom < 11) {
         leafletProxy("AQMap", session) %>%
           hideGroup("labelMarkers")
       } else {
@@ -658,7 +723,7 @@ server <- function(input, output, session) {
   })
   
   # ---- Analyze Graph ----
-  output$Line_Graph_Analyze <- renderPlot({
+  output$Line_Graph_Analyze <- renderGirafe({
     
     
     if (input$time_select_input_line_graph_analyze == "custom range" && !is.null(input$custom_date_range)) {
@@ -708,7 +773,7 @@ server <- function(input, output, session) {
     linecolor <- getColor(dataset[which.max(dataset$Date), first(background_bars$var)], first(background_bars$var))
     
     max_y_value <- max(dataset[[input$variable_select_input_line_graph_analyze]])
-    
+    #print(max_y_value)
     # Set the y-axis limits dynamically
     if (max_y_value > 101) {
       p <- p + scale_y_continuous(limits = c(0, max_y_value))
@@ -718,8 +783,12 @@ server <- function(input, output, session) {
       scaletop <- 101
     }
     
+    background_bars$ymax[length(background_bars$ymax)] <- scaletop
+    
     background_bars <- background_bars[background_bars$ymin <= scaletop - 6, ]
     
+    dataset <- dataset %>%
+      mutate(tooltip_label = as.character(glue::glue("{name}<br>{first(background_bars$var)}: {dataset[[first(background_bars$var)]]}<br>{Date_Only}")))
     
     
     p <- ggplot() +
@@ -732,16 +801,28 @@ server <- function(input, output, session) {
       scale_fill_identity() +
       scale_x_datetime(labels = scales::time_format("%I %p\n%b %d"), breaks = pretty_breaks(n = 5)) +
       
-      geom_line(data = dataset, aes(x = Date, y = .data[[first(background_bars$var)]]), color = linecolor, size = 1.5) + 
+      #geom_line(data = dataset, aes(x = Date, y = .data[[first(background_bars$var)]]), color = linecolor, size = 1.5) + 
+      geom_line_interactive(data = dataset, aes(x = Date, y = .data[[first(background_bars$var)]], color = name, data_id = sensor_index), 
+                            size = 1.3, alpha = 1) +
+      
+      geom_point_interactive(data = dataset, aes(x = Date, y = .data[[first(background_bars$var)]], color = name, 
+                                                 tooltip = tooltip_label, data_id = sensor_index), 
+                             size = 7, alpha = 0) +
+      
+      
       
       
       geom_hline(yintercept = background_bars$ymin, color = background_bars$fill, size = 0.5, na.rm = TRUE) +  # Make border lines thinner
-      geom_label_repel(aes(x = max(dataset$Date), y = background_bars$ymin + 4, label = background_bars$label),
-                       fill = "#17171799", color = background_bars$fill, 
-                       size = 5.5, fontface = "bold", vjust = 0.45, hjust = 0, show.legend = FALSE, segment.color = NA,
+      #geom_label_repel(aes(x = max(dataset$Date), y = background_bars$ymin + 4, label = background_bars$label),
+      #                 fill = "#17171799", color = background_bars$fill, 
+      #                 size = 5.5, fontface = "bold", vjust = 0.45, hjust = 0, show.legend = FALSE, segment.color = NA,
+      #                 box.padding = unit(0.2, "lines"), label.padding = unit(0.2, "lines"),
+      #                 label.r = 0.3, na.rm = TRUE, label.size=0) +
+      geom_label_repel(aes(x = max(dataset$Date), y = background_bars$ymin, label = background_bars$label),
+                       fill = "#171717", color = background_bars$fill, 
+                       size = 5.5, fontface = "bold", vjust = 0.5, hjust = 0, show.legend = FALSE, segment.color = NA,
                        box.padding = unit(0.2, "lines"), label.padding = unit(0.2, "lines"),
                        label.r = 0.3, na.rm = TRUE, label.size=0) +
-      
       
       
       labs(x = "Day", y = "") +
@@ -754,26 +835,43 @@ server <- function(input, output, session) {
         #axis.title.y = element_text(face = "bold", size = 12),  # Make y-axis title bold and adjust size
         axis.text.x = element_text(size = 11),
         axis.text.y = element_text(face = "bold", size = 14),
-        legend.position = "none",
+        #legend.position = "none",
         panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank()
+        panel.grid.minor = element_blank(),
+        
+        legend.title = element_blank(),  # Remove legend title
+        legend.text = element_text(size = 7),  # Adjust legend text size
+        legend.position = c(.05, .95),
+        legend.justification = c("left", "top"),
+        legend.box.just = "left",
+        legend.margin = margin(3, 3, 3, 3),
+        legend.background = element_rect(fill = alpha("#000000", 0.4))
       )
     
-    return(p)
+    t <- girafe(ggobj = p, options = list(
+      opts_hover(css = "stroke-width:3.5; opacity: 1;"),
+      opts_hover_inv(css = "opacity: 0.1;"),
+      opts_tooltip(css = "background-color: rgba(0, 0, 0, 0.8); color: white; border-radius: 5px; padding: 5px;"),
+      opts_selection(type = "none")
+    ))
+    
+    return(t)
+
   }
   
   # ---- Calendar Plot ----
   
   output$Calendar_Plot_Analyze <- renderPlot({
     
-    
-    CurrentMonth = lubridate::month(Sys.Date())
+    print(lubridate::month(Sys.Date()))
+    CurrentMonth = 5#lubridate::month(Sys.Date())
     CurrentYear = lubridate::year(Sys.Date())
-    
+    #print(input$time_select_input_line_calendar_analyze)
     if (input$time_select_input_line_calendar_analyze == "month")
     {
       filtered_SensorDataDBHistorical <- SensorDataDBHistorical %>%
         filter(year(Date_Only) == CurrentYear & month(Date_Only) == CurrentMonth)
+      #print("test")
     }
     else
     {
@@ -817,18 +915,16 @@ server <- function(input, output, session) {
     if (input$time_select_input_line_calendar_analyze == "month")
     {
       
+      #print(as.Date(Sys.Date()))
       
-      
-      events <- rep(NA, lubridate::days_in_month(as.Date(Sys.Date())))
+      events <- rep(NA, lubridate::days_in_month(CurrentMonth))
       
       events[filtered_data$Day_Number] <- as.character(sprintf("%04d", filtered_data$Day_Number))
       
       desired_order <- as.character(filtered_data$Day_Number)
       
       ordered_colors <- filtered_data$colors[order(desired_order)]
-      
-      
-      #print(events[!sapply(events, is.na)])
+
       p <- calendR(month = CurrentMonth,  # May
                    #year = 2025,
                    special.days = events,
@@ -842,7 +938,7 @@ server <- function(input, output, session) {
                    bg.img = "custom_background.png",
                    
                    
-                   title = "Daily rainfall in #my city in 2021",  # Change the title
+                   title = "",  # Change the title
                    title.size = 0,                  # Font size of the title
                    title.col = 1,                    # Color of the title
                    weeknames = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"), # Change week day names
@@ -886,7 +982,7 @@ server <- function(input, output, session) {
         
         
         
-        title = "Daily rainfall in #my city in 2021",  # Change the title
+        title = "",  # Change the title
         title.size = 0,                  # Font size of the title
         title.col = 1,                    # Color of the title
         weeknames = c("S", "M", "T", "W", "T", "F", "S"), # Change week day names
@@ -1125,8 +1221,8 @@ server <- function(input, output, session) {
   
   
   output$SensorListOneLinePlot <- renderGirafe({
-    
-    start_date <- as.POSIXct(Sys.Date() - 7, tz = "UTC")
+    #cutoff
+    start_date <- as.POSIXct(Sys.Date() - 40, tz = "UTC")
     end_date <- as.POSIXct(Sys.Date() + 1, tz = "UTC") - seconds(1)
     
     all_sensors <- sensorLists$list1
@@ -1137,12 +1233,14 @@ server <- function(input, output, session) {
     avg_data <- filtered_data %>%
       group_by(Date_Only) %>%
       summarise(across(everything(), ~ mean(.x, na.rm = TRUE)))#, .names = "avg_{.col}"))
+    avg_data$name <- "List One Average"
     
+    print(avg_data)
     
     tryCatch({
       if(input$averageCheckboxCompare==TRUE)
       {
-        p <- GraphPlot(filtered_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index"))
+        p <- GraphPlot(avg_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index"))
       }
       else
       {
@@ -1159,8 +1257,8 @@ server <- function(input, output, session) {
   })
   
   output$SensorListTwoLinePlot <- renderGirafe({
-    
-    start_date <- as.POSIXct(Sys.Date() - 7, tz = "UTC")
+    #cutoff
+    start_date <- as.POSIXct(Sys.Date() - 40, tz = "UTC")
     end_date <- as.POSIXct(Sys.Date() + 1, tz = "UTC") - seconds(1)
     
     all_sensors <- sensorLists$list2
@@ -1173,12 +1271,12 @@ server <- function(input, output, session) {
     avg_data <- filtered_data %>%
       group_by(Date_Only) %>%
       summarise(across(everything(), ~ mean(.x, na.rm = TRUE)))#, .names = "avg_{.col}"))
+    avg_data$name <- "List Two Average"
     
-
     tryCatch({
       if(input$averageCheckboxCompare==TRUE)
       {
-        p <- GraphPlot(filtered_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index"))
+        p <- GraphPlot(avg_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index"))
       }
       else
       {
@@ -1240,6 +1338,7 @@ server <- function(input, output, session) {
       scaletop <- 101
     }
     
+    background_bars$ymax[length(background_bars$ymax)] <- scaletop
     background_bars <- background_bars[background_bars$ymin <= scaletop - 6, ]
     
     end_points <- dataset %>%
@@ -1266,11 +1365,11 @@ server <- function(input, output, session) {
       
  
       geom_line_interactive(data = dataset, aes(x = Date, y = .data[[first(background_bars$var)]], color = name, data_id = sensor_index), 
-                            size = 1.4, alpha = 1) +
+                            size = 1.3, alpha = 1) +
       
       geom_point_interactive(data = dataset, aes(x = Date, y = .data[[first(background_bars$var)]], color = name, 
                                                 tooltip = tooltip_label, data_id = sensor_index), 
-                            size = 1.7, alpha = 0.4) +
+                            size = 7, alpha = 0) +
       
       geom_hline(yintercept = background_bars$ymin, color = background_bars$fill, size = 0.5, na.rm = TRUE) +  # Make border lines thinner
       
@@ -1308,7 +1407,7 @@ server <- function(input, output, session) {
       )
     
     t <- girafe(ggobj = p, options = list(
-      opts_hover(css = "stroke-width:3; opacity: 1;"),
+      opts_hover(css = "stroke-width:3.5; opacity: 1;"),
       opts_hover_inv(css = "opacity: 0.1;"),
       opts_tooltip(css = "background-color: rgba(0, 0, 0, 0.8); color: white; border-radius: 5px; padding: 5px;"),
       opts_selection(type = "none")
