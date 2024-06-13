@@ -12,6 +12,7 @@ library(reshape2)
 library(ggrepel)
 library(calendR)
 library(ggiraph)
+library(base64enc)
 
 calculate_aqi_pm25 <- function(pm25) {
   breakpoints <- data.frame(
@@ -52,17 +53,27 @@ SensorDataDBHistorical <- data.frame(
   temperature = combined_data$temperature_60minute,
   #pm2.5_60minute = ifelse(combined_data$source == "EPA", combined_data$pm2.5_atm, combined_data$pm2.5_60minute),
   pm2.5_60minute = ifelse(combined_data$source == "EPA", combined_data$pm2.5_atm, combined_data$pm2.5_60minute),
-  
-  
+  pm2.5_60minute_a = combined_data$pm2.5_60minute_a,
+  pm2.5_60minute_b = combined_data$pm2.5_60minute_b,
+  Humidity = combined_data$humidity_60minute,
+  Pressure = combined_data$pressure_60minute,
   
   latitude = combined_data$latitude,
   longitude = combined_data$longitude,
   source = combined_data$source
 )
+SensorDataDBHistorical$temperature <- ceiling(as.numeric(SensorDataDBHistorical$temperature))
+SensorDataDBHistorical$Humidity <- ceiling(as.numeric(SensorDataDBHistorical$Humidity))
+SensorDataDBHistorical$Pressure <- ceiling(as.numeric(SensorDataDBHistorical$Pressure))
+
 
 SensorDataDBHistorical$Date_Only <- as.Date(SensorDataDBHistorical$Date)
 SensorDataDBHistorical <- subset(SensorDataDBHistorical, !is.na(pm2.5_60minute))
 SensorDataDBHistorical$Air_Quality_Index <- calculate_aqi_pm25(SensorDataDBHistorical$pm2.5_60minute)
+
+
+#view(SensorDataDBHistorical)
+
 SensorDataDBHistorical <- SensorDataDBHistorical %>%
   rename("Temperature_(f)" = temperature)
 
@@ -79,33 +90,42 @@ cutoff_date <- Sys.time() - days(40)
 SensorDataDB <- SensorDataDB %>%
   filter(Date >= cutoff_date)
 
-view(SensorDataDB)
+
 #select the inputs
 
 getVarList <- function() {
-  return(c("Air_Quality_Index", "Temperature_(f)"))
+  return(c("Air_Quality_Index", "Temperature_(f)", "Pressure", "Humidity"))
 }
 
 getColor <- function(var, inputVar) {
-  
   if (inputVar == "Air_Quality_Index") {
+    # Color ranges for Air Quality Index
     ifelse(var <= 50, "Green",
            ifelse(var <= 100, "Yellow",
                   ifelse(var <= 150, "Orange",
                          ifelse(var <= 200, "Red",
                                 ifelse(var <= 300, "Purple", "#7E0023")))))
-  } else if (inputVar == "Temperature_(f)"){
+  } else if (inputVar == "Temperature_(f)") {
+    # Color ranges for Temperature
     ifelse(var < 0, "Blue",
            ifelse(var <= 32, "LightBlue",
                   ifelse(var <= 50, "LightGreen",
                          ifelse(var <= 70, "Green",
                                 ifelse(var <= 90, "Yellow",
                                        ifelse(var <= 100, "Orange", "Red"))))))
+  } else if (inputVar == "Pressure") {
+    # Color ranges for Pressure
+    ifelse(var < 980, "Red",
+           ifelse(var <= 1013, "Yellow",
+                  ifelse(var <= 1040, "Green", "Blue")))
+  } else if (inputVar == "Humidity") {
+    # Color ranges for Humidity
+    ifelse(var < 30, "Yellow",
+           ifelse(var <= 50, "Green", "Blue"))
   }
 }
 
 getBackgroundBarsTemplate <- function(input) {
-  
   if (input == "Air_Quality_Index") {
     background_bars_template <- data.frame(
       var = "Air_Quality_Index",
@@ -114,13 +134,31 @@ getBackgroundBarsTemplate <- function(input) {
       ymax = rep(c(50, 100, 150, 200, 300, 1000)),
       fill = rep(c("Green", "Yellow", "Orange", "Red", "Purple", "#7E0023"))
     )
-  } else if (input == "Temperature_(f)"){
+  } else if (input == "Temperature_(f)") {
     background_bars_template <- data.frame(
       var = "Temperature_(f)",
-      label = c("Freezing", "Cold", "Cool", "Warm", "Hot", "Extremly Hot"),
+      label = c("Freezing", "Cold", "Cool", "Warm", "Hot", "Extremely Hot"),
       ymin = rep(c(0, 32, 50, 70, 90, 100)),
       ymax = rep(c(32, 50, 70, 90, 100, 1000)),
-      fill = rep(c("LightBlue", "LightGreen", "Green", "Yellow", "Orange", "red"))
+      fill = rep(c("LightBlue", "LightGreen", "Green", "Yellow", "Orange", "Red"))
+    )
+  } else if (input == "Pressure") {
+    # Bar ranges and colors for Pressure based on EPA guidelines
+    background_bars_template <- data.frame(
+      var = "Pressure",
+      label = c("Low", "Normal", "High", "Extreme"),
+      ymin = c(0, 980, 1013, 1040),
+      ymax = c(980, 1013, 1040, 1100),
+      fill = c("Red", "Yellow", "Green", "Blue")
+    )
+  } else if (input == "Humidity") {
+    # Bar ranges and colors for Humidity based on EPA guidelines
+    background_bars_template <- data.frame(
+      var = "Humidity",
+      label = c("Low", "Normal", "High"),
+      ymin = c(0, 30, 50),
+      ymax = c(30, 50, 100),
+      fill = c("Yellow", "Green", "Blue")
     )
   }
   
@@ -285,6 +323,8 @@ ui <- dashboardPage(
           padding: 0px;
           border-radius: 0px;
           
+        
+          
         #go_to_analyze {
           background-color: #1F1F1F;
           color: #F89C14;
@@ -298,6 +338,19 @@ ui <- dashboardPage(
           background-color: #6f6f6f;
         }
         
+        #close_draggable {
+          background-color: #1F1F1F;  /* Red background */
+          color: #FF0000;  /* White text */
+          border: 1px solid #FF0000;
+          padding: 5px 10px;
+          border-radius: 4px;
+          font-size: 14px;
+          font-weight: bold;
+          margin-top: 0px;  /* Ensure no extra margin */
+        }
+        #close_draggable:hover {
+          background-color: #6f6f6f;
+        }
         
         
           
@@ -311,9 +364,18 @@ ui <- dashboardPage(
                   width = 6,
                   position = "relative",
                   div(id = "AQMapContainer", leafletOutput("AQMap")),
-                  tags$div(id = "draggableContainer",
-                           girafeOutput("plotInfo", height = "300px", width = "325px"),
-                           actionButton("go_to_analyze", "See Details", style = "margin-top: 0px;")
+                  conditionalPanel(
+                    condition = "output.draggableVisible == true",
+                    tags$div(id = "draggableContainer",
+                             style = "margin-top: 0px;",
+                             girafeOutput("plotInfo", height = "300px", width = "360px"),
+                             div(
+                               style = "display: flex !important;",
+                               actionButton("go_to_analyze", "See Details", style = "margin-top: 0px;margin-top: 0px; margin-right: 5px;"),
+                               actionButton("close_draggable", "Close", style = "margin-top: 0px;")
+                             )
+                         
+                    )
                   )
                 ),
                 tags$div(
@@ -483,6 +545,9 @@ ui <- dashboardPage(
                 ),
                 box(
                   width = NULL, 
+                  selectInput("variable_select_compare", "Variable",
+                              choices = getVarList(),
+                              selected = "Air_Quality_Index"),
                   checkboxInput("averageCheckboxCompare", "Average Values in Graph", value = FALSE)
                 )
               )
@@ -543,6 +608,22 @@ ui <- dashboardPage(
 server <- function(input, output, session) {
   
   
+  generate_star_svg <- function(hex_color, size = 20, move_up = 2) {
+    # Construct the SVG string with adjusted y-coordinates
+    svg_string <- sprintf(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 24 24" fill="%s">
+       <polygon points="12,%d 15,%d 24,%d 17,%d 19,%d 12,%d 5,%d 7,%d 0,%d 9,%d"/>
+     </svg>',
+      size, size, hex_color,
+      2 - move_up, 10 - move_up, 10 - move_up, 15 - move_up, 24 - move_up, 19 - move_up, 24 - move_up, 15 - move_up, 10 - move_up, 10 - move_up
+    )
+    
+    # Encode the SVG string into a data URI
+    svg_data_uri <- paste0("data:image/svg+xml;base64,", base64encode(charToRaw(svg_string)))
+    
+    return(svg_data_uri)
+  }
+  
   
   
   # ---- Maps ----
@@ -556,12 +637,23 @@ server <- function(input, output, session) {
   
   CurrentMapSensorId <- reactiveVal(0)
   
+  draggableVisible <- reactiveVal(TRUE)
   
+  observeEvent(input$close_draggable, {
+    draggableVisible(FALSE)
+  })
   
+  observeEvent(input$AQMap_marker_click, {
+    draggableVisible(TRUE)
+  })
+  
+  output$draggableVisible <- reactive({
+    draggableVisible()
+  })
+  outputOptions(output, "draggableVisible", suspendWhenHidden = FALSE)
   
   twentyFourHourGraph <- function(dataset){
     #cutoff
-    #print(dataset)
     CurrentMapSensorId(first(dataset$sensor_index))
     #print(dataset)
     start_date <- as.POSIXct(Sys.Date() - 40, tz = "UTC")
@@ -593,7 +685,7 @@ server <- function(input, output, session) {
         stroke = TRUE, 
         fillOpacity = 0.85,
         group = "markers2",
-        radius = if(dataset$source=="PurpleAir"){17}else{27}, # Increase radius on hover
+        radius = if(dataset$source=="PurpleAir"){17}else{24}, # Increase radius on hover
         color = getColor(dataset[[input$variable_select_input_map]], input$variable_select_input_map)
       )
   }
@@ -629,14 +721,18 @@ server <- function(input, output, session) {
         
       ) %>%
       
-      addCircleMarkers(
+      addMarkers(
         data = EPA_data,
         lng = ~longitude,
         lat = ~latitude,
-        color = getColor(TargetDataMap(), input$variable_select_input_map),
-        radius = 25,
-        stroke = FALSE, 
-        fillOpacity = 0.85,
+        #color = getColor(TargetDataMap(), input$variable_select_input_map),
+        #radius = 25,
+        #stroke = FALSE, 
+        #fillOpacity = 0.85,
+        icon = icons(
+          iconUrl = sapply(getColor(TargetDataMap(), input$variable_select_input_map), generate_star_svg, size = 50),
+          iconWidth = 50, iconHeight = 50
+        ),
         
         
       ) %>%
@@ -646,11 +742,17 @@ server <- function(input, output, session) {
         lng = ~longitude,
         lat = ~latitude,
         label = TargetDataMap(),
-        labelOptions = labelOptions(noHide = TRUE, direction = "center", textOnly = TRUE, style = list(
-          "color" = "black",
-          "font-size" = "10px"
-          #"border-color" = "white"
-        )),
+        labelOptions = labelOptions(
+          noHide = TRUE, 
+          direction = "center", 
+          textOnly = TRUE, 
+          #offset = ifelse(FilteredSensorDataDB$source == "EPA", c(0, -2), c(0, 0)),
+          style = list(
+            "color" = "black",
+            "font-size" = "10px"
+            #"border-color" = "white"
+          )
+        ),
         group = "labelMarkers"
       ) %>%
       
@@ -743,6 +845,8 @@ server <- function(input, output, session) {
     dataset <- SensorDataDBHistorical[SensorDataDBHistorical$sensor_index == CurrentMapSensorId(), ]
     
     
+    
+    
     print(GraphPlot(dataset, start_date, end_date, getBackgroundBarsTemplate(input$variable_select_input_line_graph_analyze)))
     
     
@@ -757,6 +861,8 @@ server <- function(input, output, session) {
     
   })
   
+
+  
   GraphPlot <- function(dataset, start_date, end_date, background_bars)
   {
     
@@ -770,9 +876,9 @@ server <- function(input, output, session) {
     #print(dataset[[input$variable_select_input_line_graph_analyze]]))
     
     #print(first(background_bars$var))
-    linecolor <- getColor(dataset[which.max(dataset$Date), first(background_bars$var)], first(background_bars$var))
+    #linecolor <- getColor(dataset[which.max(dataset$Date), first(background_bars$var)], first(background_bars$var))
     
-    max_y_value <- max(dataset[[input$variable_select_input_line_graph_analyze]])
+    max_y_value <- max(dataset[[first(background_bars$var)]])
     #print(max_y_value)
     # Set the y-axis limits dynamically
     if (max_y_value > 101) {
@@ -803,7 +909,7 @@ server <- function(input, output, session) {
       
       #geom_line(data = dataset, aes(x = Date, y = .data[[first(background_bars$var)]]), color = linecolor, size = 1.5) + 
       geom_line_interactive(data = dataset, aes(x = Date, y = .data[[first(background_bars$var)]], color = name, data_id = sensor_index), 
-                            size = 1.3, alpha = 1) +
+                            size = 1, alpha = 1) +
       
       geom_point_interactive(data = dataset, aes(x = Date, y = .data[[first(background_bars$var)]], color = name, 
                                                  tooltip = tooltip_label, data_id = sensor_index), 
@@ -847,6 +953,29 @@ server <- function(input, output, session) {
         legend.margin = margin(3, 3, 3, 3),
         legend.background = element_rect(fill = alpha("#000000", 0.4))
       )
+    
+    #print(calculate_aqi_pm25(10))
+    #print()
+    if(first(background_bars$var)=="Air_Quality_Index" & first(dataset$source) == "PurpleAir")
+    {
+      dataset <- subset(dataset, !is.na(pm2.5_60minute_a))
+      dataset$Air_Quality_Index_A <- calculate_aqi_pm25(dataset$pm2.5_60minute_a)
+      dataset$Air_Quality_Index_B <- calculate_aqi_pm25(dataset$pm2.5_60minute_b)
+      p <- p + 
+        geom_line_interactive(data = dataset, aes(x = Date, y = .data[["Air_Quality_Index_A"]], color = name), 
+                                     size = 1, alpha = 0.2) +
+        
+        geom_point_interactive(data = dataset, aes(x = Date, y = .data[["Air_Quality_Index_A"]], color = name, 
+                                                   ), 
+                               size = 7, alpha = 0) +
+        
+        geom_line_interactive(data = dataset, aes(x = Date, y = .data[["Air_Quality_Index_B"]], color = name), 
+                              size = 1, alpha = 0.2) +
+        
+        geom_point_interactive(data = dataset, aes(x = Date, y = .data[["Air_Quality_Index_B"]], color = name), 
+                               size = 7, alpha = 0)
+        
+    }
     
     t <- girafe(ggobj = p, options = list(
       opts_hover(css = "stroke-width:3.5; opacity: 1;"),
@@ -1055,21 +1184,46 @@ server <- function(input, output, session) {
   
   
   output$AQMapCompare <- renderLeaflet({
+    
+    
+    
     FilteredSensorDataDB <- SensorDataDB %>%
-      filter(!is.na(.[["Air_Quality_Index"]]))
+      filter(!is.na(.[[input$variable_select_compare]]))
+    
+    #FilteredSensorDataDB <- SensorDataDB %>%
+    #  filter(!is.na(.[[input$variable_select_input_map]]))
+    
+    EPA_data <- FilteredSensorDataDB %>% filter(source == "EPA")
+    
+    
+    PurpleAir_data <- FilteredSensorDataDB %>% filter(source != "EPA")
     
     
     leaflet(FilteredSensorDataDB) %>%
       addProviderTiles(provider = providers$CartoDB.DarkMatter) %>%
       addCircleMarkers(
+        data = PurpleAir_data,
         lng = ~longitude,
         lat = ~latitude,
-        color = getColor(TargetDataMap(), "Air_Quality_Index"),
+        color = getColor(TargetDataMap(), input$variable_select_compare),
         radius = 15,
         stroke = FALSE, 
         fillOpacity = 0.85,
         layerId = ~sensor_index
-      ) %>%
+      ) %>% 
+      addMarkers(
+        data = EPA_data,
+        lng = ~longitude,
+        lat = ~latitude,
+        layerId = ~sensor_index,
+        #color = getColor(TargetDataMap(), input$variable_select_input_map),
+        #radius = 25,
+        #stroke = FALSE, 
+        #fillOpacity = 0.85,
+        icon = icons(
+          iconUrl = sapply(getColor(TargetDataMap(), input$variable_select_compare), generate_star_svg, size = 50),
+          iconWidth = 50, iconHeight = 50
+        )) %>% 
       addLabelOnlyMarkers(
         lng = ~longitude,
         lat = ~latitude,
@@ -1240,11 +1394,11 @@ server <- function(input, output, session) {
     tryCatch({
       if(input$averageCheckboxCompare==TRUE)
       {
-        p <- GraphPlot(avg_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index"))
+        p <- GraphPlot(avg_data, start_date, end_date, getBackgroundBarsTemplate(input$variable_select_compare))
       }
       else
       {
-        p <- GraphPlotMulti(filtered_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index"))
+        p <- GraphPlot(filtered_data, start_date, end_date, getBackgroundBarsTemplate(input$variable_select_compare))
       }
       
       print(p)
@@ -1276,11 +1430,11 @@ server <- function(input, output, session) {
     tryCatch({
       if(input$averageCheckboxCompare==TRUE)
       {
-        p <- GraphPlot(avg_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index"))
+        p <- GraphPlot(avg_data, start_date, end_date, getBackgroundBarsTemplate(input$variable_select_compare))
       }
       else
       {
-        p <- GraphPlotMulti(filtered_data, start_date, end_date, getBackgroundBarsTemplate("Air_Quality_Index"))
+        p <- GraphPlot(filtered_data, start_date, end_date, getBackgroundBarsTemplate(input$variable_select_compare))
       }
       
       print(p)
@@ -1312,109 +1466,7 @@ server <- function(input, output, session) {
   
   
   
-  GraphPlotMulti <- function(dataset, start_date, end_date, background_bars)
-  {
-    
-    dataset <- dataset[dataset$Date >= start_date &
-                         dataset$Date <= end_date, ]
-    
-    start_date <- min(dataset$Date)
-    end_date <- max(dataset$Date)
-    
-    
-    #print(dataset[[input$variable_select_input_line_graph_analyze]]))
-    
-    #print(first(background_bars$var))
-    linecolor <- getColor(dataset[which.max(dataset$Date), first(background_bars$var)], first(background_bars$var))
-    
-    max_y_value <- max(dataset[[input$variable_select_input_line_graph_analyze]])
-    
-    # Set the y-axis limits dynamically
-    if (max_y_value > 101) {
-      p <- p + scale_y_continuous(limits = c(0, max_y_value))
-      scaletop <- max_y_value
-    } else {
-      p <- p + scale_y_continuous(limits = c(0, 101))
-      scaletop <- 101
-    }
-    
-    background_bars$ymax[length(background_bars$ymax)] <- scaletop
-    background_bars <- background_bars[background_bars$ymin <= scaletop - 6, ]
-    
-    end_points <- dataset %>%
-      group_by(name) %>%
-      filter(Date == max(Date)) %>%
-      ungroup()
-    
-    dataset <- dataset %>%
-      mutate(tooltip_label = as.character(glue::glue("{name}<br>{first(background_bars$var)}: {dataset[[first(background_bars$var)]]}<br>{Date_Only}")))
-               
-
-
-    
-    
-    p <- ggplot() +
-      
-
-    
-      geom_rect(data = background_bars, 
-                aes(xmin = start_date, xmax = end_date, ymin = ymin, ymax = ymax, fill = fill, text = label), 
-                color = NA, alpha = 0.08) +
-      scale_fill_identity() +
-      scale_x_datetime(labels = scales::time_format("%I %p\n%b %d"), breaks = pretty_breaks(n = 5)) +
-      
- 
-      geom_line_interactive(data = dataset, aes(x = Date, y = .data[[first(background_bars$var)]], color = name, data_id = sensor_index), 
-                            size = 1.3, alpha = 1) +
-      
-      geom_point_interactive(data = dataset, aes(x = Date, y = .data[[first(background_bars$var)]], color = name, 
-                                                tooltip = tooltip_label, data_id = sensor_index), 
-                            size = 7, alpha = 0) +
-      
-      geom_hline(yintercept = background_bars$ymin, color = background_bars$fill, size = 0.5, na.rm = TRUE) +  # Make border lines thinner
-      
-     geom_label_repel(aes(x = max(dataset$Date), y = background_bars$ymin, label = background_bars$label),
-                      fill = "#171717", color = background_bars$fill, 
-                      size = 3.5, fontface = "bold", vjust = 0.5, hjust = 0, show.legend = FALSE, segment.color = NA,
-                      box.padding = unit(0.2, "lines"), label.padding = unit(0.2, "lines"),
-                      label.r = 0.3, na.rm = TRUE, label.size=0) +
-      
-      
-      
-      labs(x = "Day", y = "") +
-      
-      ggtitle(paste("Current", gsub("_", " ", first(background_bars$var))))+
-      dark_theme() +
-      theme(
-        plot.title = element_text(face = "bold", size = 18),  # Make title bold
-        axis.title.x = element_text(face = "bold", size = 14),  # Make x-axis title bold and adjust size
-        #axis.title.y = element_text(face = "bold", size = 12),  # Make y-axis title bold and adjust size
-        axis.text.x = element_text(size = 11),
-        axis.text.y = element_text(face = "bold", size = 14),
-        #legend.position = "none",
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        
-        
-        #legend.position = "bottom",  # Position legend at the bottom
-        legend.title = element_blank(),  # Remove legend title
-        legend.text = element_text(size = 7),  # Adjust legend text size
-        legend.position = c(.05, .95),
-        legend.justification = c("left", "top"),
-        legend.box.just = "left",
-        legend.margin = margin(3, 3, 3, 3),
-        legend.background = element_rect(fill = alpha("#000000", 0.4))
-      )
-    
-    t <- girafe(ggobj = p, options = list(
-      opts_hover(css = "stroke-width:3.5; opacity: 1;"),
-      opts_hover_inv(css = "opacity: 0.1;"),
-      opts_tooltip(css = "background-color: rgba(0, 0, 0, 0.8); color: white; border-radius: 5px; padding: 5px;"),
-      opts_selection(type = "none")
-    ))
-    
-    return(t)
-  }
+  
   
   
   
