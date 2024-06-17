@@ -13,6 +13,64 @@ library(ggrepel)
 library(calendR)
 library(ggiraph)
 library(base64enc)
+library(DBI)
+library(RSQLite)
+
+
+query_data <- function(start_date, end_date, sensor_index = NULL, params = c("name", "time_stamp", "source", "sensor_index", "latitude", "longitude", "humidity_60minute", "temperature_60minute", "pressure_60minute", "\"pm2.5_aqi\"", "\"pm2.5_60minute\"", "\"pm2.5_60minute_a\"", "\"pm2.5_60minute_b\"")) {
+  # Connect to the database
+  
+  start_date <- as.numeric(start_date)
+  end_date <- as.numeric(end_date)
+  
+  con <- dbConnect(RSQLite::SQLite(), "db.sqlite")  # Modify the connection string for your database
+  
+  # Construct the base query
+  base_query <- paste("SELECT ", paste(params, collapse = ", "), " FROM df_all WHERE time_stamp BETWEEN '", start_date, "' AND '", end_date, "'", sep="")
+  
+  # Add sensor_index condition if provided
+  if (!is.null(sensor_index)) {
+    base_query <- paste(base_query, "AND sensor_index =", sensor_index)
+  }
+  
+  # Debug: Print the final query
+  #print(paste("Final query:", base_query))
+  
+  # Execute the query
+  result <- dbGetQuery(con, base_query)
+  
+  # Disconnect from the database
+  dbDisconnect(con)
+  
+  #print(result)
+  
+  
+  result$temperature_60minute <- ceiling(as.numeric(result$temperature_60minute))
+  result$humidity_60minute <- ceiling(as.numeric(result$humidity_60minute))
+  result$pressure_60minute <- ceiling(as.numeric(result$pressure_60minute))
+  result$time_stamp <- as.POSIXct(result$time_stamp, origin = "1970-01-01", tz = "UTC")
+  
+  #print("yesy")
+  
+  result <- result %>%
+    rename("Temperature_(f)" = temperature_60minute)
+  result <- result %>%
+    rename("Humidity" = humidity_60minute)
+  result <- result %>%
+    rename("Pressure" = pressure_60minute)
+  result <- result %>%
+    rename("Date" = time_stamp)
+  result <- result %>%
+    rename("Air_Quality_Index" = pm2.5_aqi)
+
+
+  
+  
+  result$Date_Only <- as.Date(result$Date)
+  
+  
+  return(result)
+}
 
 calculate_aqi_pm25 <- function(pm25) {
   breakpoints <- data.frame(
@@ -45,50 +103,53 @@ calculate_aqi_pm25 <- function(pm25) {
 #SensorDataDBHistorical$Air_Quality_Index <- con2aqi("pm25", SensorDataDBHistorical$pm2.5_10minute)
 #SensorDataDBHistorical$Date <- as.POSIXct(SensorDataDBHistorical$last_seen, origin = "1970-01-01", tz = "UTC")
 #SensorDataDBHistorical$Date_Only <- as.Date(SensorDataDBHistorical$Date)
-SensorDataDBHistorical <- data.frame(
-  name = combined_data$name,
-  sensor_index = combined_data$sensor_index,
-  Date = combined_data$time_stamp,
-  #pm2.5_60minute = combined_data$pm2.5_60minute,
-  temperature = combined_data$temperature_60minute,
-  #pm2.5_60minute = ifelse(combined_data$source == "EPA", combined_data$pm2.5_atm, combined_data$pm2.5_60minute),
-  pm2.5_60minute = ifelse(combined_data$source == "EPA", combined_data$pm2.5_atm, combined_data$pm2.5_60minute),
-  pm2.5_60minute_a = combined_data$pm2.5_60minute_a,
-  pm2.5_60minute_b = combined_data$pm2.5_60minute_b,
-  Humidity = combined_data$humidity_60minute,
-  Pressure = combined_data$pressure_60minute,
+#SensorDataDBHistorical <- data.frame(
+#  name = combined_data$name,
+#  sensor_index = combined_data$sensor_index,
+#  Date = combined_data$time_stamp,
+#  #pm2.5_60minute = combined_data$pm2.5_60minute,
+#  temperature = combined_data$temperature_60minute,
+#  #pm2.5_60minute = ifelse(combined_data$source == "EPA", combined_data$pm2.5_atm, combined_data$pm2.5_60minute),
+#  pm2.5_60minute = ifelse(combined_data$source == "EPA", combined_data$pm2.5_atm, combined_data$pm2.5_60minute),
+#  pm2.5_60minute_a = combined_data$pm2.5_60minute_a,
+#  pm2.5_60minute_b = combined_data$pm2.5_60minute_b,
+#  Humidity = combined_data$humidity_60minute,
+#  Pressure = combined_data$pressure_60minute,
   
-  latitude = combined_data$latitude,
-  longitude = combined_data$longitude,
-  source = combined_data$source
-)
-SensorDataDBHistorical$temperature <- ceiling(as.numeric(SensorDataDBHistorical$temperature))
-SensorDataDBHistorical$Humidity <- ceiling(as.numeric(SensorDataDBHistorical$Humidity))
-SensorDataDBHistorical$Pressure <- ceiling(as.numeric(SensorDataDBHistorical$Pressure))
+#  latitude = combined_data$latitude,
+#  longitude = combined_data$longitude,
+#  source = combined_data$source
+#)
+#SensorDataDBHistorical$temperature <- ceiling(as.numeric(SensorDataDBHistorical$temperature))
+#SensorDataDBHistorical$Humidity <- ceiling(as.numeric(SensorDataDBHistorical$Humidity))
+#SensorDataDBHistorical$Pressure <- ceiling(as.numeric(SensorDataDBHistorical$Pressure))
 
 
-SensorDataDBHistorical$Date_Only <- as.Date(SensorDataDBHistorical$Date)
-SensorDataDBHistorical <- subset(SensorDataDBHistorical, !is.na(pm2.5_60minute))
-SensorDataDBHistorical$Air_Quality_Index <- calculate_aqi_pm25(SensorDataDBHistorical$pm2.5_60minute)
+#SensorDataDBHistorical$Date_Only <- as.Date(SensorDataDBHistorical$Date)
+#SensorDataDBHistorical <- subset(SensorDataDBHistorical, !is.na(pm2.5_60minute))
+#SensorDataDBHistorical$Air_Quality_Index <- calculate_aqi_pm25(SensorDataDBHistorical$pm2.5_60minute)
 
 
 #view(SensorDataDBHistorical)
 
-SensorDataDBHistorical <- SensorDataDBHistorical %>%
-  rename("Temperature_(f)" = temperature)
+#SensorDataDBHistorical <- SensorDataDBHistorical %>%
+#  rename("Temperature_(f)" = temperature)
+
+print(query_data(Sys.time()-days(40), Sys.time(), NULL))
 
 
-SensorDataDB <- SensorDataDBHistorical %>%
+SensorDataDB <- query_data(Sys.time()-days(40), Sys.time(), NULL) %>%
   arrange(sensor_index, desc(Date)) %>%
   group_by(sensor_index) %>%
   slice(1) %>%
   ungroup()
 
+SensorDataDBHistorical <- query_data(Sys.time()-days(40), Sys.time(), NULL)
 
 #cutoff
-cutoff_date <- Sys.time() - days(40)
-SensorDataDB <- SensorDataDB %>%
-  filter(Date >= cutoff_date)
+#cutoff_date <- Sys.time() - days(40)
+#SensorDataDB <- SensorDataDB %>%
+#  filter(Date >= cutoff_date)
 
 
 #select the inputs
@@ -655,11 +716,13 @@ server <- function(input, output, session) {
   twentyFourHourGraph <- function(dataset){
     #cutoff
     CurrentMapSensorId(first(dataset$sensor_index))
+    #print(CurrentMapSensorId(first(dataset$sensor_index)))
     #print(dataset)
     start_date <- as.POSIXct(Sys.Date() - 40, tz = "UTC")
     end_date <- as.POSIXct(Sys.Date() + 1, tz = "UTC") - seconds(1)
     
     tryCatch({
+      
       p <- GraphPlot(dataset, start_date, end_date, getBackgroundBarsTemplate(input$variable_select_input_map))
     }, error = function(e) {
       print(paste("An error occurred:", e$message))
@@ -773,11 +836,15 @@ server <- function(input, output, session) {
     hovered_lat <- SensorDataDB$latitude[2]
     hovered_lng <- SensorDataDB$longitude[2]
     
+    
+    
     lat_lng_filter <- SensorDataDB$latitude == hovered_lat & SensorDataDB$longitude == hovered_lng
     marker_data <- SensorDataDB[lat_lng_filter, ]
     
     lat_lng_filter_historical <- SensorDataDBHistorical$latitude == hovered_lat & SensorDataDBHistorical$longitude == hovered_lng
     historical_data <- SensorDataDBHistorical[lat_lng_filter_historical, ]
+    
+    
     
     #Add Plot and Marker Animation
     
@@ -802,6 +869,9 @@ server <- function(input, output, session) {
   
   #Load Graph and Animation When Markers are clicked
   observeEvent(input$AQMap_marker_click, {
+
+    #print(SensorDataDBHistorical)
+    
     hovered_lat <- input$AQMap_marker_click$lat
     hovered_lng <- input$AQMap_marker_click$lng
     
@@ -810,6 +880,9 @@ server <- function(input, output, session) {
     
     lat_lng_filter_historical <- SensorDataDBHistorical$latitude == hovered_lat & SensorDataDBHistorical$longitude == hovered_lng
     historical_data <- SensorDataDBHistorical[lat_lng_filter_historical, ]
+    
+
+    #print(historical_data)
     
     #Add Plot and Marker Animation
     twentyFourHourGraph(historical_data)
@@ -842,10 +915,10 @@ server <- function(input, output, session) {
       end_date <- as.POSIXct(Sys.Date() + 1, tz = "UTC") - seconds(1)
     }
     
-    dataset <- SensorDataDBHistorical[SensorDataDBHistorical$sensor_index == CurrentMapSensorId(), ]
+    #dataset <- SensorDataDBHistorical[SensorDataDBHistorical$sensor_index == CurrentMapSensorId(), ]
     
     
-    
+    dataset <- query_data(start_date, end_date, CurrentMapSensorId())
     
     print(GraphPlot(dataset, start_date, end_date, getBackgroundBarsTemplate(input$variable_select_input_line_graph_analyze)))
     
@@ -873,12 +946,51 @@ server <- function(input, output, session) {
     end_date <- max(dataset$Date)
     
     
+    
     #print(dataset[[input$variable_select_input_line_graph_analyze]]))
     
     #print(first(background_bars$var))
     #linecolor <- getColor(dataset[which.max(dataset$Date), first(background_bars$var)], first(background_bars$var))
+
+    max_y_value <- max(na.omit(dataset[[first(background_bars$var)]]))
     
-    max_y_value <- max(dataset[[first(background_bars$var)]])
+
+
+    p <- ggplot()
+
+    if(first(background_bars$var)=="Air_Quality_Index" & first(dataset$source) == "PurpleAir")
+    {
+      
+      dataset <- subset(dataset, !is.na(pm2.5_60minute_a))
+      dataset$Air_Quality_Index_A <- calculate_aqi_pm25(dataset$pm2.5_60minute_a)
+      dataset$Air_Quality_Index_B <- calculate_aqi_pm25(dataset$pm2.5_60minute_b)
+      
+      max_a <- max(dataset$Air_Quality_Index_A, na.rm = TRUE)
+      max_b <- max(dataset$Air_Quality_Index_B, na.rm = TRUE)
+      max_value <- max(max_a, max_b, na.rm = TRUE)
+      
+      
+      if (!is.na(max_value) && max_value > max_y_value) {
+        max_y_value <- max_value
+      }
+      
+      p <- p + 
+        geom_line_interactive(data = dataset, aes(x = Date, y = .data[["Air_Quality_Index_A"]], color = name), 
+                              size = 1, alpha = 0.2) +
+        
+        geom_point_interactive(data = dataset, aes(x = Date, y = .data[["Air_Quality_Index_A"]], color = name, 
+        ), 
+        size = 7, alpha = 0) +
+        
+        geom_line_interactive(data = dataset, aes(x = Date, y = .data[["Air_Quality_Index_B"]], color = name), 
+                              size = 1, alpha = 0.2) +
+        
+        geom_point_interactive(data = dataset, aes(x = Date, y = .data[["Air_Quality_Index_B"]], color = name), 
+                               size = 7, alpha = 0)
+      
+    }
+    
+    
     #print(max_y_value)
     # Set the y-axis limits dynamically
     if (max_y_value > 101) {
@@ -888,23 +1000,33 @@ server <- function(input, output, session) {
       p <- p + scale_y_continuous(limits = c(0, 101))
       scaletop <- 101
     }
+
+    #print(scaletop)
     
-    background_bars$ymax[length(background_bars$ymax)] <- scaletop
+    
     
     background_bars <- background_bars[background_bars$ymin <= scaletop - 6, ]
+    background_bars$ymax[length(background_bars$ymax)] <- scaletop
+    #print(background_bars)
+    
+    #tail(background_bars$ymax) <- scaletop
     
     dataset <- dataset %>%
       mutate(tooltip_label = as.character(glue::glue("{name}<br>{first(background_bars$var)}: {dataset[[first(background_bars$var)]]}<br>{Date_Only}")))
     
     
-    p <- ggplot() +
+    p <- p +
+      #geom_hline(yintercept = scaletop, color = "blue", size = 0.5, na.rm = TRUE) +  # Make border lines thinner
+      scale_fill_identity() +
       
       
+      #geom_rect(aes(xmin = start_date, xmax = end_date, ymin = tail(background_bars2$ymin), ymax = scaletop, fill = tail(background_bars2$fill)), 
+      #          color = NA, alpha = 0.08) +
       
       geom_rect(data = background_bars, 
                 aes(xmin = start_date, xmax = end_date, ymin = ymin, ymax = ymax, fill = fill), 
                 color = NA, alpha = 0.08) +
-      scale_fill_identity() +
+      
       scale_x_datetime(labels = scales::time_format("%I %p\n%b %d"), breaks = pretty_breaks(n = 5)) +
       
       #geom_line(data = dataset, aes(x = Date, y = .data[[first(background_bars$var)]]), color = linecolor, size = 1.5) + 
@@ -919,6 +1041,9 @@ server <- function(input, output, session) {
       
       
       geom_hline(yintercept = background_bars$ymin, color = background_bars$fill, size = 0.5, na.rm = TRUE) +  # Make border lines thinner
+      
+      
+      
       #geom_label_repel(aes(x = max(dataset$Date), y = background_bars$ymin + 4, label = background_bars$label),
       #                 fill = "#17171799", color = background_bars$fill, 
       #                 size = 5.5, fontface = "bold", vjust = 0.45, hjust = 0, show.legend = FALSE, segment.color = NA,
@@ -956,26 +1081,7 @@ server <- function(input, output, session) {
     
     #print(calculate_aqi_pm25(10))
     #print()
-    if(first(background_bars$var)=="Air_Quality_Index" & first(dataset$source) == "PurpleAir")
-    {
-      dataset <- subset(dataset, !is.na(pm2.5_60minute_a))
-      dataset$Air_Quality_Index_A <- calculate_aqi_pm25(dataset$pm2.5_60minute_a)
-      dataset$Air_Quality_Index_B <- calculate_aqi_pm25(dataset$pm2.5_60minute_b)
-      p <- p + 
-        geom_line_interactive(data = dataset, aes(x = Date, y = .data[["Air_Quality_Index_A"]], color = name), 
-                                     size = 1, alpha = 0.2) +
-        
-        geom_point_interactive(data = dataset, aes(x = Date, y = .data[["Air_Quality_Index_A"]], color = name, 
-                                                   ), 
-                               size = 7, alpha = 0) +
-        
-        geom_line_interactive(data = dataset, aes(x = Date, y = .data[["Air_Quality_Index_B"]], color = name), 
-                              size = 1, alpha = 0.2) +
-        
-        geom_point_interactive(data = dataset, aes(x = Date, y = .data[["Air_Quality_Index_B"]], color = name), 
-                               size = 7, alpha = 0)
-        
-    }
+    
     
     t <- girafe(ggobj = p, options = list(
       opts_hover(css = "stroke-width:3.5; opacity: 1;"),
@@ -995,16 +1101,19 @@ server <- function(input, output, session) {
     print(lubridate::month(Sys.Date()))
     CurrentMonth = 5#lubridate::month(Sys.Date())
     CurrentYear = lubridate::year(Sys.Date())
+    
+    #dataset <- query_data(start_date, end_date, CurrentMapSensorId())
+    dataset <- query_data(Sys.time()-days(500), Sys.time(), CurrentMapSensorId())
     #print(input$time_select_input_line_calendar_analyze)
     if (input$time_select_input_line_calendar_analyze == "month")
     {
-      filtered_SensorDataDBHistorical <- SensorDataDBHistorical %>%
+      filtered_SensorDataDBHistorical <- dataset %>%
         filter(year(Date_Only) == CurrentYear & month(Date_Only) == CurrentMonth)
       #print("test")
     }
     else
     {
-      filtered_SensorDataDBHistorical <- SensorDataDBHistorical %>%
+      filtered_SensorDataDBHistorical <- dataset %>%
         filter(year(Date_Only) == CurrentYear)
     }
     
@@ -1379,17 +1488,19 @@ server <- function(input, output, session) {
     start_date <- as.POSIXct(Sys.Date() - 40, tz = "UTC")
     end_date <- as.POSIXct(Sys.Date() + 1, tz = "UTC") - seconds(1)
     
+    dataset <- query_data(start_date, end_date, NULL)
+    
     all_sensors <- sensorLists$list1
     
-    filtered_data <- SensorDataDBHistorical %>%
+    filtered_data <- dataset %>%
       filter(name %in% all_sensors)
     
     avg_data <- filtered_data %>%
       group_by(Date_Only) %>%
       summarise(across(everything(), ~ mean(.x, na.rm = TRUE)))#, .names = "avg_{.col}"))
     avg_data$name <- "List One Average"
-    
-    print(avg_data)
+    avg_data$source <- "List One Average"
+
     
     tryCatch({
       if(input$averageCheckboxCompare==TRUE)
@@ -1415,9 +1526,11 @@ server <- function(input, output, session) {
     start_date <- as.POSIXct(Sys.Date() - 40, tz = "UTC")
     end_date <- as.POSIXct(Sys.Date() + 1, tz = "UTC") - seconds(1)
     
+    dataset <- query_data(start_date, end_date, NULL)
+    
     all_sensors <- sensorLists$list2
     
-    filtered_data <- SensorDataDBHistorical %>%
+    filtered_data <- dataset %>%
       filter(name %in% all_sensors)
     
 
@@ -1426,6 +1539,7 @@ server <- function(input, output, session) {
       group_by(Date_Only) %>%
       summarise(across(everything(), ~ mean(.x, na.rm = TRUE)))#, .names = "avg_{.col}"))
     avg_data$name <- "List Two Average"
+    avg_data$source <- "List One Average"
     
     tryCatch({
       if(input$averageCheckboxCompare==TRUE)
