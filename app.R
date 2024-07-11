@@ -161,6 +161,10 @@ presets <- list(
   
 )
 
+# sources list for different shapes, requires that you make a "source" field in the data that has the name of all of your souces that get mapped here
+SourceToShapeMapper <- list(PurpleAir = "PurpleAir", EPA = 5, AQMesh = 3)
+#First value must be a string equal to itself, since it is te main one that will be using the circles on the map, the next ones just need a number to represent the sides of the shape that it uses as an icon
+
 # Function to get background bars template for graphs based on input variable
 getBackgroundBarsTemplate <- function(input) {
   if (input == "Air_Quality_Index") {
@@ -790,8 +794,16 @@ ui <- dashboardPage(
                           selectInput("variable_select_compare", "Variable",
                                       choices = getVarList(),
                                       selected = "Air_Quality_Index"),
+                          selectInput("time_select_input_line_graph_compare", "Select Time Input",
+                                      choices = c("1 day", "7 days","30 days","90 days","365 days","custom range"),
+                                      selected = "30 days"),
+                          conditionalPanel(
+                            condition = "input.time_select_input_line_graph_compare == 'custom range'",
+                            dateRangeInput("custom_date_range_compare", "Select Date Range")
+                          ),
                           checkboxInput("averageCheckboxCompare", "Average Values in Graph", value = FALSE),
                           actionButton("addPresetButton", "Add Preset")
+                          
                         )
                       )
                   )
@@ -846,22 +858,37 @@ ui <- dashboardPage(
 server <- function(input, output, session) {
   
   #function to create a custom star image of the chosen color
-  generate_star_svg <- function(hex_color, size = 20, move_up = 2) {
+  generate_star_svg <- function(hex_color, size = 20, move_up = 0, num_sides = 5) {
+    # Function to calculate the coordinates of the points
+    calculate_points <- function(cx, cy, r, num_sides) {
+      points <- ""
+      angle_step <- 2 * pi / num_sides
+      for (i in 0:(num_sides-1)) {
+        angle <- i * angle_step - pi / 2
+        x <- cx + r * cos(angle)
+        y <- cy + r * sin(angle) - move_up
+        points <- paste(points, sprintf("%.2f,%.2f", x, y), sep = " ")
+      }
+      return(trimws(points))
+    }
+    
+    # Calculate points for the star
+    points <- calculate_points(12, 12, 10, num_sides)
+    
+    # Generate the SVG string
     svg_string <- sprintf(
       '<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 24 24" fill="%s">
-   	<polygon points="12,%d 15,%d 24,%d 17,%d 19,%d 12,%d 5,%d 7,%d 0,%d 9,%d"/>
- 	</svg>',
-      size, size, hex_color,
-      2 - move_up, 10 - move_up, 10 - move_up, 15 - move_up, 24 - move_up, 19 - move_up, 24 - move_up, 15 - move_up, 10 - move_up, 10 - move_up
+      <polygon points="%s"/>
+    </svg>',
+      size, size, hex_color, points
     )
-    
     
     svg_data_uri <- paste0("data:image/svg+xml;base64,", base64encode(charToRaw(svg_string)))
     
     return(svg_data_uri)
+    
   }
-  
-  
+
   
   # ---- Maps ----
   
@@ -1021,12 +1048,16 @@ server <- function(input, output, session) {
       )
   }
   
+  
+  
   # Create the Leaflet map object
   output$AQMap <- renderLeaflet({
     FilteredSensorDataDB <- getSensorDataDB() %>%
       filter(!is.na(.[[input$variable_select_input_map]]))
-    EPA_data <- FilteredSensorDataDB %>% filter(source == "EPA")
-    PurpleAir_data <- FilteredSensorDataDB %>% filter(source != "EPA")
+    EPA_data <- FilteredSensorDataDB %>% filter(source != SourceToShapeMapper[[1]])
+    PurpleAir_data <- FilteredSensorDataDB %>% filter(source == SourceToShapeMapper[[1]])
+    
+    
     leaflet(FilteredSensorDataDB) %>%
       addRasterImage(
         getHeatmap(input$variable_select_input_map),
@@ -1056,9 +1087,17 @@ server <- function(input, output, session) {
         lng = ~longitude,
         lat = ~latitude,
         icon = icons(
-          iconUrl = sapply(getColor(EPA_data[[input$variable_select_input_map]], input$variable_select_input_map), generate_star_svg, size = 50),
+          iconUrl = lapply(1:nrow(EPA_data), function(i) {
+            source <- EPA_data$source[i]
+            hex_color <- getColor(EPA_data[[input$variable_select_input_map]], input$variable_select_input_map)
+            num_sides <- SourceToShapeMapper[[source]]
+            generate_star_svg(hex_color, size = 50, num_sides = num_sides)
+          }),
           iconWidth = 50, iconHeight = 50
         )
+        
+        
+        
       ) %>%
       addLabelOnlyMarkers(
         data = FilteredSensorDataDB,
@@ -1405,7 +1444,7 @@ server <- function(input, output, session) {
           title = "",
           title.size = 0,
           title.col = 1,
-          weeknames = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"),
+          weeknames = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"),
           start = "M",
           col = "#f2f2f2",
           lwd = 1,
@@ -1429,7 +1468,7 @@ server <- function(input, output, session) {
           title = "",
           title.size = 0,
           title.col = 1,
-          weeknames = c("S", "M", "T", "W", "T", "F", "S"),
+          weeknames = c("M", "T", "W", "T", "F", "S", "S"),
           start = "M",
           col = "#f2f2f2",
           lwd = 0.5,
@@ -1517,11 +1556,8 @@ server <- function(input, output, session) {
     FilteredSensorDataDB <- getSensorDataDB() %>%
       filter(!is.na(.[[input$variable_select_compare]]))
     
-    # Filter data for EPA source
-    EPA_data <- FilteredSensorDataDB %>% filter(source == "EPA")
-    
-    # Filter data for PurpleAir source (non-EPA)
-    PurpleAir_data <- FilteredSensorDataDB %>% filter(source != "EPA")
+    EPA_data <- FilteredSensorDataDB %>% filter(source != SourceToShapeMapper[[1]])
+    PurpleAir_data <- FilteredSensorDataDB %>% filter(source == SourceToShapeMapper[[1]])
     
     # Create the Leaflet map
     leaflet(FilteredSensorDataDB) %>%
@@ -1548,7 +1584,12 @@ server <- function(input, output, session) {
         lat = ~latitude,
         layerId = ~sensor_index,
         icon = icons(
-          iconUrl = sapply(getColor(EPA_data[[input$variable_select_compare]], input$variable_select_compare), generate_star_svg, size = 50),
+          iconUrl = lapply(1:nrow(EPA_data), function(i) {
+            source <- EPA_data$source[i]
+            hex_color <- getColor(EPA_data[[input$variable_select_input_map]], input$variable_select_input_map)
+            num_sides <- SourceToShapeMapper[[source]]
+            generate_star_svg(hex_color, size = 50, num_sides = num_sides)
+          }),
           iconWidth = 50, iconHeight = 50
         )) %>%
       addLabelOnlyMarkers(
@@ -1733,8 +1774,21 @@ server <- function(input, output, session) {
   
   # Render the line plot for sensor list 1 using the previusly made graphplot function
   output$SensorListOneLinePlot <- renderGirafe({
-    start_date <- as.POSIXct(Sys.Date() - 40, tz = "UTC")
-    end_date <- as.POSIXct(Sys.Date() + 1, tz = "UTC") - seconds(1)
+    if (input$time_select_input_line_graph_compare == "custom range" && !is.null(input$custom_date_range_compare)) {
+      start_date <- as.POSIXct(input$custom_date_range_compare[1], tz = "UTC")
+      end_date <- as.POSIXct(input$custom_date_range_compare[2], tz = "UTC")
+      
+    } else {
+      # Otherwise, use the predefined time ranges
+      time_input <- switch(input$time_select_input_line_graph_compare,
+                           "1 day" = 1,
+                           "7 days" = 7,
+                           "30 days" = 30,
+                           "90 days" = 90,
+                           "365 days" = 365)
+      start_date <- as.POSIXct(Sys.Date() - days(time_input), tz = "UTC")
+      end_date <- as.POSIXct(Sys.Date() + 1, tz = "UTC") - seconds(1)
+    }
     
     dataset <- query_data(start_date, end_date, NULL)
     
@@ -1783,8 +1837,22 @@ server <- function(input, output, session) {
   
   # Render the line plot for sensor list 2 using the previusly made graphplot function
   output$SensorListTwoLinePlot <- renderGirafe({
-    start_date <- as.POSIXct(Sys.Date() - 40, tz = "UTC")
-    end_date <- as.POSIXct(Sys.Date() + 1, tz = "UTC") - seconds(1)
+    if (input$time_select_input_line_graph_compare == "custom range" && !is.null(input$custom_date_range_compare)) {
+      start_date <- as.POSIXct(input$custom_date_range_compare[1], tz = "UTC")
+      end_date <- as.POSIXct(input$custom_date_range_compare[2], tz = "UTC")
+      
+    } else {
+      # Otherwise, use the predefined time ranges
+      time_input <- switch(input$time_select_input_line_graph_compare,
+                           "1 day" = 1,
+                           "7 days" = 7,
+                           "30 days" = 30,
+                           "90 days" = 90,
+                           "365 days" = 365)
+      start_date <- as.POSIXct(Sys.Date() - days(time_input), tz = "UTC")
+      end_date <- as.POSIXct(Sys.Date() + 1, tz = "UTC") - seconds(1)
+    }
+
     
     dataset <- query_data(start_date, end_date, NULL)
     
