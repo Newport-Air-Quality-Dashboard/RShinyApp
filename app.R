@@ -1,30 +1,25 @@
-library(shiny)
-library(shinydashboard)
-library(tidyverse)
-library(leaflet)
-library(shinycssloaders)
-library(leaflet.extras)
-library(htmltools)
-library(plotly)
-library(scales)
+# List of required packages
+required_packages <- c(
+  "shiny", "shinydashboard", "tidyverse", "leaflet", "shinycssloaders",
+  "leaflet.extras", "htmltools", "plotly", "scales", "reshape2",
+  "ggrepel", "calendR", "ggiraph", "base64enc", "DBI", "RSQLite",
+  "shinyWidgets", "XML", "xml2", "RColorBrewer", "gstat", "sp",
+  "colorRamps", "raster", "sf"
+)
 
-library(reshape2)
-library(ggrepel)
-library(calendR)
-library(ggiraph)
-library(base64enc)
-library(DBI)
-library(RSQLite)
+# Check if each package is installed and install if necessary
+install_if_missing <- function(packages) {
+  for (pkg in packages) {
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      install.packages(pkg, dependencies = TRUE)
+    }
+  }
+}
 
-library(shinyWidgets)
-library(XML)
-library(xml2)
-library(RColorBrewer)
-library(gstat)
-library(sp)
-library(colorRamps)
-library(raster)
-library(sf)
+install_if_missing(required_packages)
+
+# Load all required packages
+lapply(required_packages, library, character.only = TRUE)
 
 
 # Function to query data from a database within a specified date range and optional sensor index
