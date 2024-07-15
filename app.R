@@ -4,7 +4,7 @@ required_packages <- c(
   "leaflet.extras", "htmltools", "plotly", "scales", "reshape2",
   "ggrepel", "calendR", "ggiraph", "base64enc", "DBI", "RSQLite",
   "shinyWidgets", "XML", "xml2", "RColorBrewer", "gstat", "sp",
-  "colorRamps", "raster", "sf"
+  "colorRamps", "raster", "sf", "httr", "later"
 )
 
 # Check if each package is installed and install if necessary
@@ -200,12 +200,24 @@ interpolate <- function(d, grid_points) {
   interpolated_values
 }
 
+#There is an option to have people sign up for phone notifications, but it rquires the paid service "nexmo", here you can set that up
+#---- yesy ----
+
+SMSTimer <- 300 #define time beetween notifications in seconds
+
+# https://www.vonage.com/communications-apis/sms/ Here you can get an account and get the 3 following values to run notifs
+nexmo_api_key <- ""
+nexmo_api_secret <- ""
+nexmo_from <- "" # Should be in E.164 format
+
+#Finally, define the message you want to send
+notification_message <- "This is a test message from the air quality dashboard."
 
 #If you know CSS, you can use the code below to customize the entire look of the page
 
 # ---- Customize Look ----
-  dark_theme_general <- function() {
-    tags$style(HTML("
+dark_theme_general <- function() {
+  tags$style(HTML("
       .content-wrapper, .right-side {
         background-color: #1F1F1F !important;
       }
@@ -213,10 +225,10 @@ interpolate <- function(d, grid_points) {
         color: white !important;
       }
     "))
-  }
-  
-  # Custom CSS to format boxes for home page
-  css_box_home <- "
+}
+
+# Custom CSS to format boxes for home page
+css_box_home <- "
   .home-page .tab-content .tab-pane {
     background-color: #1F1F1F;
     color: white;
@@ -267,9 +279,9 @@ interpolate <- function(d, grid_points) {
   
   
   "
-  
-  # Custom CSS to format boxes for analyze page
-  css_analyze <- "
+
+# Custom CSS to format boxes for analyze page
+css_analyze <- "
   	.analyze-page .tab-content .tab-pane {
     	background-color: #1F1F1F !important;
     	color: white !important;
@@ -313,34 +325,34 @@ interpolate <- function(d, grid_points) {
   	}
   
     "
-  
-  
-  # Graph theme for dark background with custom colors
-  dark_theme <- function() {
-    theme_minimal() +
-      theme(
-        panel.background = element_rect(fill = "#1F1F1F"), # Dark background
-        panel.grid.major = element_line(color = "#505050"), # Dark grid lines
-        panel.grid.minor = element_blank(),
-        axis.line = element_line(color = "white"), # White axes
-        axis.text = element_text(color = "white"),
-        axis.title = element_text(color = "white"),
-        plot.background = element_rect(fill = "#1F1F1F"), # White plot background
-        panel.border = element_rect(color = "white", fill = NA), # White plot border
-        legend.text = element_text(color = "white"), # White legend text
-        legend.background = element_rect(fill = "#1F1F1F", color = NA), # White legend background
-        strip.text = element_text(color = "white"), # White strip text
-        plot.title = element_text(color = "white") # White title text
-      )
-  }
+
+
+# Graph theme for dark background with custom colors
+dark_theme <- function() {
+  theme_minimal() +
+    theme(
+      panel.background = element_rect(fill = "#1F1F1F"), # Dark background
+      panel.grid.major = element_line(color = "#505050"), # Dark grid lines
+      panel.grid.minor = element_blank(),
+      axis.line = element_line(color = "white"), # White axes
+      axis.text = element_text(color = "white"),
+      axis.title = element_text(color = "white"),
+      plot.background = element_rect(fill = "#1F1F1F"), # White plot background
+      panel.border = element_rect(color = "white", fill = NA), # White plot border
+      legend.text = element_text(color = "white"), # White legend text
+      legend.background = element_rect(fill = "#1F1F1F", color = NA), # White legend background
+      strip.text = element_text(color = "white"), # White strip text
+      plot.title = element_text(color = "white") # White title text
+    )
+}
 
 
 
 
-  
+
 
 # ---- Change Home/Help ----
-  
+
 #Finally, below are the "box" systems for the home and help page of your site, customize them, changing the text and images
 # to suit your sites needs
 home_tab_boxes <- fluidPage(
@@ -353,21 +365,28 @@ home_tab_boxes <- fluidPage(
            box(
              title = "Our Purpose",
              width = NULL,
-             HTML("In the Greater Cincinnati Area, the air can be good or bad, and it affects the people living there.
-                     	This dashboard helps people in Cincinnati know how clean or dirty the air is every day.
-                     	It has a map and some other tools to help people see how the air around them is changing.<br><br>
-                     	Made by Re:Newport, Databloom, and the NKU Math Department")
+             HTML("Air quality can impact human health and the health of the environment.
+                     	The quality of our air, or how clean it is, can change from day to day, season to season, and sometimes even by the hour.
+                     	This dashboard provides information to residents in the Cincinnati region on their air quality.
+                     	You can use the map and other tools to see how air quality is changing.<br><br>
+                     	Dashboard created in partnership by ReNewport, Databloom, Groundwork Ohio River Valley, and Northern Kentucky University")
            )
     )
   ),
   fluidRow(
     column(width = 12,
            box(
-             title = "A Guide to AQI",
+             title = "A Guide to AQI and Sensors on the Map",
              width = NULL,
-             HTML("The Air Quality Index (AQI) was created by the Environmental Protection Agency to tell people how clean or dirty the air is.
-                     	It shows if five major pollutants (ground-level ozone, fine particles, carbon monoxide, sulfur dioxide, and nitrogen dioxide) are at levels that could be bad for our health.<br><br>",
-                  HTML('<img src="https://www.csueastbay.edu/airquality/files/images/epa_aqi_2.JPG" style="width:75%;height:auto;">')
+             HTML("The Air Quality Index (AQI) was created by the U.S. Environmental Protection Agency to tell people how clean or dirty the air is.
+                     	It shows if five major pollutants (ground-level ozone, fine particles, carbon monoxide, sulfur dioxide, and nitrogen dioxide) are at levels that could harm human health.<br><br>",
+                  HTML('<img src="https://www.csueastbay.edu/airquality/files/images/epa_aqi_2.JPG" style="width:75%;height:auto;">'),
+                  HTML('<br><a href="https://www.airnow.gov/aqi/aqi-basics/" target="_blank">More Information About AQI</a><br>'),
+                  HTML("<br>Sensors on the map are represented by three different shapes: a circle, a pentagon, and a triangle. 
+                                 These symbols represent PurpleAir sensors, EPA sensors, and AQ Mesh sensors respectively.<br>"),
+                  HTML('<img src="https://www.pngmart.com/files/23/Green-Circle-PNG-Image.png" style="width:10%;height:auto;">PurpleAir'),
+                  HTML('<img src="https://static.vecteezy.com/system/resources/thumbnails/020/906/687/small_2x/geometric-pentagon-shape-on-a-transparent-background-free-png.png" style="width:10%;height:auto;">EPA'),
+                  HTML('<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Green_triangle.svg/1152px-Green_triangle.svg.png" style="width:10%;height:auto; transform: rotate(180deg);">AQ Mesh')
              )
            )
     )
@@ -375,24 +394,23 @@ home_tab_boxes <- fluidPage(
   fluidRow(
     column(width = 12,
            box(
-             title = "Our Map Varies because Sensors Vary",
+             title = "Causes for Air Pollution to Vary",
              width = NULL,
              HTML("The amount of pollution in cities can be very different depending on the area.
                           	The devices that measure pollution are put in different places, so they show different results depending on their surroundings.<br><br>
                           	<strong>Industry</strong><br>
-                          	In industrial areas, things like diesel trucks stopping or driving through, machines burning fuel, and using more oil can make the pollution much worse.
-                          	However, there are rules to control this pollution, and it should go away over time.<br><br>
+                          	In industrial areas, things like diesel trucks stopping or driving through, machines burning fuel can make the pollution much worse.<br><br>
                           	<strong>Traffic</strong><br>
-                          	Cars cause pollution from their exhaust and from their tires wearing out and brakes being used.
-                          	This makes pollution higher near roads and traffic.
+                          	Cars and trucks cause pollution from their exhaust, tires wearing out, and brakes being used.
+                          	This makes pollution higher near roads and areas with high traffic.
                           	There are also daily spikes in pollution readings in the mornings and evenings because of people traveling to and from work and school.<br><br>
                           	<strong>Weather</strong><br>
-                          	Weather can trap pollution and carry it to other places, even very far away.
-                          	It can also move wildfire smoke over long distances.<br><br>
-                          	<strong>Other Spikes</strong><br>
+                          	Weather conditions, temperature and precipitation, can influence air quality.
+                          	Warm temperatures can cause poor air quality and different weather patterns can trap or move pollution to other locations, even very far away.
+                          	For example, wildfire smoke can move very long distances.<br><br>
+                          	<strong>Other Causes for High Readings</strong><br>
                           	Sometimes, pollution monitors show very high readings for no clear reason.
-                          	This can happen because of things like spiderwebs, bad sensor placement, or sensor breakdowns.
-                          	Since we can't test the sensors ourselves, we try to ignore data that doesn't make sense."
+                          	This can happen because of things like spiderwebs, bad sensor placement, or sensor breakdowns."
              )
            )
     )
@@ -416,15 +434,15 @@ home_tab_boxes <- fluidPage(
       solidHeader = TRUE,
       tags$head(
         tags$style(HTML("
-                    	.article-box {
-                      	border: 1px solid #ddd;
-                      	padding: 10px;
-                      	margin-bottom: 10px;
-                      	display: flex;
-                      	align-items: flex-start;
-                      	flex-direction: column;
-                    	}
-                  	"))
+        	.article-box {
+          	border: 1px solid #ddd;
+          	padding: 10px;
+          	margin-bottom: 10px;
+          	display: flex;
+          	align-items: flex-start;
+          	flex-direction: column;
+        	}
+      	"))
       ),
       uiOutput("feed_output")
     )
@@ -432,15 +450,23 @@ home_tab_boxes <- fluidPage(
   fluidRow(
     column(width = 12,
            box(
-             title = "Notifications",
+             title = "Newsletter and Sensor Notifications",
              width = NULL,
-             "Pull emails"
+             HTML("The following boxes will allow you to sign up for a text newsletter 
+                       and notification system by entering your phone number below.<br><br>
+                            Please enter phone numbers in +1XXXXXXX format.<br><br>"),
+             textInput("phone", "Enter your phone number to subscribe:", ""),
+             actionButton("subscribe", "Submit"),
+             HTML("<br><br>"),
+             textInput("unsubscribe_phone", "Enter your phone number to unsubscribe:", ""),
+             actionButton("unsubscribe", "Submit"),
            )
     )
   )
+  
 )  
-  
-  
+
+
 help_tab_boxes <- fluidPage(
   fluidRow(
     column(width = 12,
@@ -525,13 +551,16 @@ help_tab_boxes <- fluidPage(
              width = NULL,
              collapsible = TRUE,
              collapsed = TRUE,
-             HTML("Re:Newport Contact")
+             HTML("Josh Tunning at Re:Newport --> tunning.josh@gmail.com<br><br>
+                Data Bloom --> grow@thedatabloom.com<br><br>
+                Andrew Long: Dashboard Supervisor --> LONGA@nku.edu<br><br>
+                Kristy Hopfensperger: Team Organizer --> hopfenspek1@nku.edu")
            )
     )
   )
 )
-  
-  
+
+
 
 # ---- Configuration Ends here ----
 
@@ -542,98 +571,98 @@ help_tab_boxes <- fluidPage(
 
 # Function to query data from a database within a specified date range and optional sensor index
 query_data <- function(start_date, end_date, sensor_index = NULL, params = c("name", "time_stamp", "source", "sensor_index", "latitude", "longitude", "humidity", "temperature", "pressure", "\"pm2.5_aqi_dashboard\"", "\"pm2.5_dashboard\"", "\"pm2.5_aqi_a_dashboard\"", "\"pm2.5_aqi_b_dashboard\"")) {
-
-# Convert dates to numeric format (POSIXct to numeric)
-start_date <- as.numeric(start_date)
-end_date <- as.numeric(end_date)
-
-# Connect to the SQLite database (modify the connection string for your database)
-con <- dbConnect(RSQLite::SQLite(), PathToDB)
-
-# Construct the base SQL query
-base_query <- paste("SELECT ", paste(params, collapse = ", "), " FROM df_all WHERE time_stamp BETWEEN '", start_date, "' AND '", end_date, "'", sep="")
-
-# Add sensor_index condition to the query if provided
-if (!is.null(sensor_index)) {
-  base_query <- paste(base_query, "AND sensor_index =", sensor_index)
-}
-
-# Execute the SQL query
-result <- dbGetQuery(con, base_query)
-
-# Disconnect from the database
-dbDisconnect(con)
-
-# Convert columns to appropriate formats
-result$time_stamp <- as.POSIXct(result$time_stamp, origin = "1970-01-01", tz = "UTC")
-
-
-tryCatch(
-  {
-    result$temperature <- ceiling(as.numeric(result$temperature))
-    result$humidity <- ceiling(as.numeric(result$humidity))
-    result$pressure <- ceiling(as.numeric(result$pressure))
-    
-    
-    # Rename columns for better readability
-    result <- result %>%
-      rename("Temperature Fahrenheit" = temperature) %>%
-      rename("Humidity" = humidity) %>%
-      rename("Pressure" = pressure) %>%
-      rename("Date" = time_stamp) %>%
-      rename("Air Quality Index" = pm2.5_aqi_dashboard)
+  
+  # Convert dates to numeric format (POSIXct to numeric)
+  start_date <- as.numeric(start_date)
+  end_date <- as.numeric(end_date)
+  
+  # Connect to the SQLite database (modify the connection string for your database)
+  con <- dbConnect(RSQLite::SQLite(), PathToDB)
+  
+  # Construct the base SQL query
+  base_query <- paste("SELECT ", paste(params, collapse = ", "), " FROM df_all WHERE time_stamp BETWEEN '", start_date, "' AND '", end_date, "'", sep="")
+  
+  # Add sensor_index condition to the query if provided
+  if (!is.null(sensor_index)) {
+    base_query <- paste(base_query, "AND sensor_index =", sensor_index)
   }
-)
-
-
-# Add a suffix to the name column based on the source
-result$name <- paste(result$name, if_else(result$source == "PurpleAir", "PA", "EPA"))
-
-# Add a new column for date only (without time)
-result$Date_Only <- as.Date(result$Date)
-
-return(result)
+  
+  # Execute the SQL query
+  result <- dbGetQuery(con, base_query)
+  
+  # Disconnect from the database
+  dbDisconnect(con)
+  
+  # Convert columns to appropriate formats
+  result$time_stamp <- as.POSIXct(result$time_stamp, origin = "1970-01-01", tz = "UTC")
+  
+  
+  tryCatch(
+    {
+      result$temperature <- ceiling(as.numeric(result$temperature))
+      result$humidity <- ceiling(as.numeric(result$humidity))
+      result$pressure <- ceiling(as.numeric(result$pressure))
+      
+      
+      # Rename columns for better readability
+      result <- result %>%
+        rename("Temperature Fahrenheit" = temperature) %>%
+        rename("Humidity" = humidity) %>%
+        rename("Pressure" = pressure) %>%
+        rename("Date" = time_stamp) %>%
+        rename("Air Quality Index" = pm2.5_aqi_dashboard)
+    }
+  )
+  
+  
+  # Add a suffix to the name column based on the source
+  result$name <- paste(result$name, if_else(result$source == "PurpleAir", "PA", "EPA"))
+  
+  # Add a new column for date only (without time)
+  result$Date_Only <- as.Date(result$Date)
+  
+  return(result)
 }
 
 # Function to calculate Air Quality Index (AQI) for PM2.5
 calculate_aqi_pm25 <- function(pm25) {
-# Define breakpoints for AQI calculation
-breakpoints <- data.frame(
-  C_low = c(0, 12.1, 35.5, 55.5, 150.5, 250.5, 350.5),
-  C_high = c(12, 35.4, 55.4, 150.4, 250.4, 350.4, 500.4),
-  AQI_low = c(0, 51, 101, 151, 201, 301, 401),
-  AQI_high = c(50, 100, 150, 200, 300, 400, 500)
-)
-
-# Find the appropriate AQI rank for the given PM2.5 value
-rank <- which(pm25 <= breakpoints$C_high)[1]
-
-# Calculate the AQI based on the breakpoints
-aqi <- ceiling((breakpoints$AQI_high[rank] - breakpoints$AQI_low[rank]) /
-                 (breakpoints$C_high[rank] - breakpoints$C_low[rank]) *
-                 (pm25 - breakpoints$C_low[rank]) + breakpoints$AQI_low[rank])
-
-return(aqi)
+  # Define breakpoints for AQI calculation
+  breakpoints <- data.frame(
+    C_low = c(0, 12.1, 35.5, 55.5, 150.5, 250.5, 350.5),
+    C_high = c(12, 35.4, 55.4, 150.4, 250.4, 350.4, 500.4),
+    AQI_low = c(0, 51, 101, 151, 201, 301, 401),
+    AQI_high = c(50, 100, 150, 200, 300, 400, 500)
+  )
+  
+  # Find the appropriate AQI rank for the given PM2.5 value
+  rank <- which(pm25 <= breakpoints$C_high)[1]
+  
+  # Calculate the AQI based on the breakpoints
+  aqi <- ceiling((breakpoints$AQI_high[rank] - breakpoints$AQI_low[rank]) /
+                   (breakpoints$C_high[rank] - breakpoints$C_low[rank]) *
+                   (pm25 - breakpoints$C_low[rank]) + breakpoints$AQI_low[rank])
+  
+  return(aqi)
 }
 
 getSensorDataDB <- function()
 {
-# Query data from the past 40 days and process it
-SensorDataDB <- query_data(Sys.time() - days(40), Sys.time(), NULL) %>%
-  arrange(sensor_index, desc(Date)) %>%
-  filter(!is.na(!!sym(PrimaryField))) %>%
-  group_by(sensor_index) %>%
-  slice(1) %>%
-  ungroup()
-
-return(SensorDataDB)
+  # Query data from the past 40 days and process it
+  SensorDataDB <- query_data(Sys.time() - days(40), Sys.time(), NULL) %>%
+    arrange(sensor_index, desc(Date)) %>%
+    filter(!is.na(!!sym(PrimaryField))) %>%
+    group_by(sensor_index) %>%
+    slice(1) %>%
+    ungroup()
+  
+  return(SensorDataDB)
 }
 
 # Query historical data from the past 40 days
 getSensorDataDBHistorical <- function()
 {
-SensorDataDBHistorical <- query_data(Sys.time() - days(40), Sys.time(), NULL)
-return(SensorDataDBHistorical)
+  SensorDataDBHistorical <- query_data(Sys.time() - days(40), Sys.time(), NULL)
+  return(SensorDataDBHistorical)
 }
 
 
@@ -1104,7 +1133,7 @@ server <- function(input, output, session) {
       
     }
     
-
+    
     
     # Cap the maximum value of z
     background_bars <- getBackgroundBarsTemplate(var)
@@ -1249,7 +1278,7 @@ server <- function(input, output, session) {
         }, error = function(e) {
           return(NULL)
         })
-
+        
       ) %>%
       addLabelOnlyMarkers(
         data = FilteredSensorDataDB,
@@ -1747,7 +1776,7 @@ server <- function(input, output, session) {
         }, error = function(e) {
           return(NULL)
         })
-
+        
       ) %>%
       addLabelOnlyMarkers(
         lng = ~longitude,
@@ -2130,9 +2159,103 @@ server <- function(input, output, session) {
       p("No articles found.")
     }
   })
+  
+  
+  
+  send_sms <- function(to, body) {
+    url <- "https://rest.nexmo.com/sms/json"
+    response <- tryCatch({
+      POST(
+        url,
+        add_headers('Content-Type' = 'application/x-www-form-urlencoded'),
+        body = list(
+          api_key = nexmo_api_key,
+          api_secret = nexmo_api_secret,
+          to = to,
+          from = nexmo_from,
+          text = body
+        ),
+        encode = "form"
+      )
+    }, error = function(e) {
+      return(NULL)
+    })
+    
+    if (is.null(response)) {
+      return("Failed to send SMS.")
+    }
+    
+    response_content <- content(response, "text")
+    print(response_content)  # Print API response for debugging
+    response_content
+  }
+  
+  # Create a global vector to store unique phone numbers
+  phone_numbers <- c()
+  
+  
+  
+  # Function to send SMS to all collected phone numbers
+  send_notifications <- function() {
+    for (phone in phone_numbers) {
+      res <- send_sms(phone, notification_message)
+    }
+    # Schedule the next notification
+    later::later(send_notifications, SMSTimer) # 600 seconds = 10 minutes
+  }
+  
+  # Start the notification timer and store the task handle
+  task_handle <- NULL
+  
+  start_notifications <- function() {
+    if (is.null(task_handle)) {
+      task_handle <<- later::later(send_notifications, 0)
+    }
+  }
+  
+  #--SMS Notification--
+  observeEvent(input$subscribe, { 
+    phone <- input$phone
+    # Validate the phone number format
+    if (grepl("^\\+?[1-9]\\d{1,14}$", phone)) {
+      # Save the phone number to the global vector if not already present
+      if (!phone %in% phone_numbers) {
+        phone_numbers <<- c(phone_numbers, phone)
+        showNotification("Phone number submitted!", type = "message")
+      } else {
+        showNotification("Phone number already submitted!", type = "warning")
+      }
+    } else {
+      showNotification("Invalid phone number format. Please use +1XXXXXXX format.", type = "error")
+    }
+    # Clear the input field
+    #updateTextInput(session, "phone", value = "") - causes error
+  })
+  
+  observeEvent(input$unsubscribe, {
+    phone <- input$unsubscribe_phone
+    # Validate the phone number format
+    if (grepl("^\\+?[1-9]\\d{1,14}$", phone)) {
+      # Remove the phone number from the global vector if present
+      if (phone %in% phone_numbers) {
+        phone_numbers <<- phone_numbers[phone_numbers != phone]
+        showNotification("Phone number unsubscribed!", type = "message")
+      } else {
+        showNotification("Phone number not found!", type = "warning")
+      }
+    } else {
+      showNotification("Invalid phone number format. Please use +1XXXXXXX format.", type = "error")
+    }
+    # Clear the input field
+    #updateTextInput(session, "unsubscribe_phone", value = "") - causes error
+  })
+  
+  # Start the notifications when the app starts
+  start_notifications()
+
 }
 
 
 shinyApp(ui, server)
 
-
+        
