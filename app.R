@@ -1,4 +1,4 @@
-# List of required packages
+# List of required packages, ignore if you dont know what this does
 required_packages <- c(
   "shiny", "shinydashboard", "tidyverse", "leaflet", "shinycssloaders",
   "leaflet.extras", "htmltools", "plotly", "scales", "reshape2",
@@ -22,110 +22,55 @@ install_if_missing(required_packages)
 lapply(required_packages, library, character.only = TRUE)
 
 
-# Function to query data from a database within a specified date range and optional sensor index
-query_data <- function(start_date, end_date, sensor_index = NULL, params = c("name", "time_stamp", "source", "sensor_index", "latitude", "longitude", "humidity", "temperature", "pressure", "\"pm2.5_aqi_dashboard\"", "\"pm2.5_dashboard\"", "\"pm2.5_aqi_a_dashboard\"", "\"pm2.5_aqi_b_dashboard\"")) {
-  
-  # Convert dates to numeric format (POSIXct to numeric)
-  start_date <- as.numeric(start_date)
-  end_date <- as.numeric(end_date)
-  
-  # Connect to the SQLite database (modify the connection string for your database)
-  con <- dbConnect(RSQLite::SQLite(), "db.sqlite")
-  
-  # Construct the base SQL query
-  base_query <- paste("SELECT ", paste(params, collapse = ", "), " FROM df_all WHERE time_stamp BETWEEN '", start_date, "' AND '", end_date, "'", sep="")
-  
-  # Add sensor_index condition to the query if provided
-  if (!is.null(sensor_index)) {
-    base_query <- paste(base_query, "AND sensor_index =", sensor_index)
-  }
-
-  # Execute the SQL query
-  result <- dbGetQuery(con, base_query)
-  
-  # Disconnect from the database
-  dbDisconnect(con)
-  
-  # Convert columns to appropriate formats
-  result$temperature <- ceiling(as.numeric(result$temperature))
-  result$humidity <- ceiling(as.numeric(result$humidity))
-  result$pressure <- ceiling(as.numeric(result$pressure))
-  result$time_stamp <- as.POSIXct(result$time_stamp, origin = "1970-01-01", tz = "UTC")
-  
-  # Rename columns for better readability
-  result <- result %>%
-    rename("Temperature_(f)" = temperature) %>%
-    rename("Humidity" = humidity) %>%
-    rename("Pressure" = pressure) %>%
-    rename("Date" = time_stamp) %>%
-    rename("Air_Quality_Index" = pm2.5_aqi_dashboard)
-  
-  # Add a suffix to the name column based on the source
-  result$name <- paste(result$name, if_else(result$source == "PurpleAir", "PA", "EPA"))
-  
-  # Add a new column for date only (without time)
-  result$Date_Only <- as.Date(result$Date)
-  
-  return(result)
-}
-
-# Function to calculate Air Quality Index (AQI) for PM2.5
-calculate_aqi_pm25 <- function(pm25) {
-  # Define breakpoints for AQI calculation
-  breakpoints <- data.frame(
-    C_low = c(0, 12.1, 35.5, 55.5, 150.5, 250.5, 350.5),
-    C_high = c(12, 35.4, 55.4, 150.4, 250.4, 350.4, 500.4),
-    AQI_low = c(0, 51, 101, 151, 201, 301, 401),
-    AQI_high = c(50, 100, 150, 200, 300, 400, 500)
-  )
-  
-  # Find the appropriate AQI rank for the given PM2.5 value
-  rank <- which(pm25 <= breakpoints$C_high)[1]
-  
-  # Calculate the AQI based on the breakpoints
-  aqi <- ceiling((breakpoints$AQI_high[rank] - breakpoints$AQI_low[rank]) /
-                   (breakpoints$C_high[rank] - breakpoints$C_low[rank]) *
-                   (pm25 - breakpoints$C_low[rank]) + breakpoints$AQI_low[rank])
-  
-  return(aqi)
-}
-
-getSensorDataDB <- function()
-{
-  # Query data from the past 40 days and process it
-  SensorDataDB <- query_data(Sys.time() - days(40), Sys.time(), NULL) %>%
-    arrange(sensor_index, desc(Date)) %>%
-    filter(!is.na(Air_Quality_Index)) %>%
-    group_by(sensor_index) %>%
-    slice(1) %>%
-    ungroup()
-  
-  return(SensorDataDB)
-}
-
-# Query historical data from the past 40 days
-getSensorDataDBHistorical <- function()
-{
-  SensorDataDBHistorical <- query_data(Sys.time() - days(40), Sys.time(), NULL)
-  return(SensorDataDBHistorical)
-}
 
 
-# Function to get a list of variables for visualization
+
+
+
+
+
+
+
+#Welcome to using the R Shiny Map Dashboard App, below is the configuration and documentation 
+#on how to make this app customizable to your use case!
+
+#If you are not experienced with code, that is alright! Just follow the steps below carefully
+#If you know what you are doing and what docs for the source itself, visit:
+#https://docs.google.com/document/d/1kRoA1Xz_unkQCap3sQ6FgI87Z4Z0aHm1t8X5GNqOU-o/edit?usp=sharing
+
+#You are expected to already have a sql style database, with a few paramaters, put the path to said DB below:
+PathToDB <- "db.sqlite"
+
+# The database is expected to have a "name" field, with the names of all the sensors, a "time_stamp" field with the time in unix, a 
+# "source" that outlines the name of the source it comes from (will go over later), a unique id for the sensor
+# named "sensor_index", a "latitude" and "longitude" variable, and a variety of "value" variables, like "humidity" etc.
+
+#Note, unless you are using the database that is provided in this project, the field name "Air_Quality_Index" is not recommended
+
+#Below change the list of parameters you plan to use from your sql database
+Sql_Params <- c("name", "time_stamp", "source", "sensor_index", "latitude", "longitude", "humidity", "temperature", "pressure", "\"pm2.5_aqi_dashboard\"", "\"pm2.5_dashboard\"", "\"pm2.5_aqi_a_dashboard\"", "\"pm2.5_aqi_b_dashboard\"")
+
+#Now here, outline the names of parameters you want to be displayed on the map in a dropdown
 getVarList <- function() {
-  return(c("Air_Quality_Index", "Temperature_(f)", "Pressure", "Humidity"))
+  return(c("Air Quality Index", "Temperature Fahrenheit", "Pressure", "Humidity"))
 }
 
-# Function to get color based on variable value and type
+#Also define which field is the primary one, this will filter all NA's in this field for all the data
+PrimaryField <- "Air Quality Index"
+
+# For each of the parameters you have chosen, replace the numbers and colors below with whatever you want to make a
+# custom range for what the colors are defined as
+
+
 getColor <- function(var, inputVar) {
-  if (inputVar == "Air_Quality_Index") {
+  if (inputVar == "Air Quality Index") {
     # Color ranges for Air Quality Index
     ifelse(var <= 50, "Green",
            ifelse(var <= 100, "Yellow",
                   ifelse(var <= 150, "Orange",
                          ifelse(var <= 200, "Red",
                                 ifelse(var <= 300, "Purple", "#7E0023")))))
-  } else if (inputVar == "Temperature_(f)") {
+  } else if (inputVar == "Temperature Fahrenheit") {
     # Color ranges for Temperature
     ifelse(var < 0, "Blue",
            ifelse(var <= 20, "LightBlue",
@@ -145,34 +90,27 @@ getColor <- function(var, inputVar) {
   }
 }
 
-InitialMapView <- c(39.0890, -84.5008, 12) #lat, lng, zoom
+#Next, do a similar process below for each of those parameters, the data should be set up in color "buckets" where values
+#beetween certain numbers fall into a bucket and get a certain color
+#var should be just the name of the parameters, the labels are the names of the buckets you are making,
+#the ymin and ymax represent the values that range each of the buckets, and the fill is the color for each of the buckets
+#notably, ymin, ymax, and fill should match what you put in for getColor
 
-#List of presets for compareMap
-presets <- list(
-  "Newport East" = c("Monitor 1 East PA","Monitor 12 East PA","Monitor 4 East PA","338 E 9th St Newport KY 41071 PA","home PA"),
-  "Newport West" = c("Monitor 9 West PA","Monitor 7 West PA","Monitor 10 West PA","Monitor 8 West PA","Monitor 6 West PA"),
-  "Newport All" = c("Monitor 1 East PA","Monitor 12 East PA","Monitor 4 East PA","338 E 9th St Newport KY 41071 PA","home PA","Monitor 9 West PA","Monitor 7 West PA","Monitor 10 West PA","Monitor 8 West PA","Monitor 6 West PA","Monitor 11 Island PA"),
-  "Cincinnati Area" = c("McFarland PA", "Longworth Square PA", "Lower Price Hill EPA", "MSD 6 PA", "Meals on Wheels PA", "Taft NCore PAMS EPA", "CFD Station 12 PA", "City-CHD PA")
-  
-)
+#If you want the heatmap colors to function properly, it is very important that each bucket is the same size,
+#you can still have different ranges though, by just having several buckets that have the same color and name
 
-# sources list for different shapes, requires that you make a "source" field in the data that has the name of all of your souces that get mapped here
-SourceToShapeMapper <- list(PurpleAir = "PurpleAir", EPA = 5, AQMesh = 3)
-#First value must be a string equal to itself, since it is te main one that will be using the circles on the map, the next ones just need a number to represent the sides of the shape that it uses as an icon
-
-# Function to get background bars template for graphs based on input variable
 getBackgroundBarsTemplate <- function(input) {
-  if (input == "Air_Quality_Index") {
+  if (input == "Air Quality Index") {
     background_bars_template <- data.frame(
-      var = "Air_Quality_Index",
+      var = "Air Quality Index",
       label = c("Good", "Moderate", "Unhealthy for Vulnerable People", "Unhealthy", "Very Unhealthy", "Hazardous"),
       ymin = rep(c(0, 50, 100, 150, 200, 300)),
       ymax = rep(c(50, 100, 150, 200, 300, 500)),
       fill = rep(c("Green", "Yellow", "Orange", "Red", "Purple", "#7E0023"))
     )
-  } else if (input == "Temperature_(f)") {
+  } else if (input == "Temperature Fahrenheit") {
     background_bars_template <- data.frame(
-      var = "Temperature_(f)",
+      var = "Temperature Fahrenheit",
       label = c("Freezing", "Cold", "Cool", "Warm", "Hot", "Extremely Hot"),
       ymin = rep(c(0, 20, 40, 60, 80, 100)),
       ymax = rep(c(20, 40, 60, 80, 100, 120)),
@@ -201,150 +139,523 @@ getBackgroundBarsTemplate <- function(input) {
   return(background_bars_template)
 }
 
-# ---- Setup stuff ----
+#Here you re defining the initial zoom location for the maps, change the first 2 coordinates to move
+#it where you see fit
 
-# Function to apply dark theme to general UI elements
-dark_theme_general <- function() {
-  tags$style(HTML("
-    .content-wrapper, .right-side {
-      background-color: #1F1F1F !important;
-    }
-    .sidebar-menu li a {
-      color: white !important;
-    }
-  "))
+InitialMapView <- c(39.0890, -84.5008, 12) #lat, lng, zoom
+
+
+#The compare map view has a list of presets that allow you to easily set up comparisons, 
+#put the "name" parameter value for the sensors/points that you want to be in specific presets.
+presets <- list(
+  "Newport East" = c("Monitor 1 East PA","Monitor 12 East PA","Monitor 4 East PA","338 E 9th St Newport KY 41071 PA","home PA"),
+  "Newport West" = c("Monitor 9 West PA","Monitor 7 West PA","Monitor 10 West PA","Monitor 8 West PA","Monitor 6 West PA"),
+  "Newport All" = c("Monitor 1 East PA","Monitor 12 East PA","Monitor 4 East PA","338 E 9th St Newport KY 41071 PA","home PA","Monitor 9 West PA","Monitor 7 West PA","Monitor 10 West PA","Monitor 8 West PA","Monitor 6 West PA","Monitor 11 Island PA"),
+  "Cincinnati Area" = c("McFarland PA", "Longworth Square PA", "Lower Price Hill EPA", "MSD 6 PA", "Meals on Wheels PA", "Taft NCore PAMS EPA", "CFD Station 12 PA", "City-CHD PA")
+)
+
+# Now, you have to define the shapes and sources, you have a "primary" source, that will show up as a circle
+# and secondary sources, which will have a shape with x sides, make a list with sourcename (no quotes) = x, so
+# so that you get the amount of desired sides for your shape, the first source should just have its own name as a string as shown below
+SourceToShapeMapper <- list(PurpleAir = "PurpleAir", EPA = 5, AQMesh = 3)
+#In this example EPA is a pentagon, and AQMesh is a triangle
+
+#Below change the link for the logo on the sidebar: First one is the logo iself, second one is where clicking it sends you
+logo_link <- "https://dxbhsrqyrr690.cloudfront.net/sidearm.nextgen.sites/nkunorse.com/images/responsive/logo_main.svg"
+target_link <- "https://dxbhsrqyrr690.cloudfront.net/sidearm.nextgen.sites/nkunorse.com/images/responsive/logo_main.svg"
+
+
+#Below change the color you would like from the options of: "blue", "black", "green", "purple", "red", "yellow"
+
+ThemeColor <- "purple"
+
+#Very advanced, this app includes a heat map, 
+#and the variogram inverse distance weighting interpolation method for the heat map is listed below:
+#Do not touch unless you know what you are doing, if you want to use the custom heat map set the UseCustomIDW to TRUE
+
+UseCustomIDW <- TRUE
+
+# Function to calculate variogram value at a given distance
+variogram_model <- function(d, n, s, r) {
+  n + s * (1 - exp(-d / r))
 }
 
-# Custom CSS to format boxes for home page
-css_box_home <- "
-.home-page .tab-content .tab-pane {
-  background-color: #1F1F1F;
-  color: white;
+# Function to calculate weights
+calculate_weights <- function(d, grid_point) {
+  n <- 0.5 #nugget
+  s <- 1000.5 #sill
+  r <- 0.06 #range
+  dists <- spDistsN1(as.matrix(d[, c("x", "y")]), as.numeric(grid_point), longlat = FALSE)
+  var_values <- variogram_model(dists, n, s, r)
+  weights <- (2 * n + s) - var_values
+  weights / sum(weights)
 }
-.home-page .box{
-  background-color: #000000D9;
-  border-color: #000000D9;
-}
-.home-page .tab-content .tab-pane,
-.home-page .nav-tabs {
-  background-color: #2E056B;
-  color: white;
-}
-.home-page .box-title {
-  font-size: 24px;
-  font-weight: bold;
-  color: white;
-}
-.home-page .form-control {
-  background-color: #333333;
-  color: white;
-}
-.home-page .selectize-dropdown {
-  background-color: #333333;
-  color: white;
-}
-.home-page .selectize-input {
-  background-color: #333333;
-  color: white;
-}
-.home-page .btn-primary {
-  background-color: #F49D37;
-  border-color: #F49D37;
-}
-.home-page .btn-primary:hover {
-  background-color: #F89C14;
-  border-color: #F89C14;
-}
-.home-page .box-header {
-  background-color: #2E056B;
-  font-size: 20px;
-  color: white;
-}
-.home-page .box-body {
-  font-size: 18px;
-  color: white;
+
+# Perform interpolation
+interpolate <- function(d, grid_points) {
+  interpolated_values <- sapply(1:nrow(grid_points), function(i) {
+    weights <- calculate_weights(d, grid_points[i,])
+    sum(weights * d$z)
+  })
+  interpolated_values
 }
 
 
-"
+#If you know CSS, you can use the code below to customize the entire look of the page
 
-# Custom CSS to format boxes for analyze page
-css_analyze <- "
-	.analyze-page .tab-content .tab-pane {
-  	background-color: #1F1F1F !important;
-  	color: white !important;
-	}
-	.analyze-page .box {
-  	background-color: #333333 !important;
-  	border-color: #444444 !important;
-	}
-	.analyze-page .box-title {
-  	font-size: 24px !important; /* Larger font size */
-  	font-weight: bold !important; /* Bold text */
-  	color: white !important; /* White text color */
-	}
-	.analyze-page .form-control {
-  	background-color: #333333 !important;
-  	color: white !important;
-	}
-	.analyze-page .selectize-dropdown {
-  	background-color: #333333 !important;
-  	color: white !important;
-	}
-	.analyze-page .selectize-input {
-  	background-color: #333333 !important;
-  	color: white !important;
-	}
-	.analyze-page .btn-primary {
-  	background-color: #F49D37 !important;
-  	border-color: #F49D37 !important;
-	}
-	.analyze-page .btn-primary:hover {
-  	background-color: #F89C14 !important;
-  	border-color: #F89C14 !important;
-	}
-	.analyze-page .box-header {
-  	background-color: #2E056B !important; /* Dark purple background */
-  	color: white !important; /* White text color */
-	}
-	.analyze-page .box-body {
-  	font-size: 18px !important; /* Larger font size */
-   	color: white !important;
-	}
-
+# ---- Customize Look ----
+  dark_theme_general <- function() {
+    tags$style(HTML("
+      .content-wrapper, .right-side {
+        background-color: #1F1F1F !important;
+      }
+      .sidebar-menu li a {
+        color: white !important;
+      }
+    "))
+  }
+  
+  # Custom CSS to format boxes for home page
+  css_box_home <- "
+  .home-page .tab-content .tab-pane {
+    background-color: #1F1F1F;
+    color: white;
+  }
+  .home-page .box{
+    background-color: #000000D9;
+    border-color: #000000D9;
+  }
+  .home-page .tab-content .tab-pane,
+  .home-page .nav-tabs {
+    background-color: #2E056B;
+    color: white;
+  }
+  .home-page .box-title {
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+  }
+  .home-page .form-control {
+    background-color: #333333;
+    color: white;
+  }
+  .home-page .selectize-dropdown {
+    background-color: #333333;
+    color: white;
+  }
+  .home-page .selectize-input {
+    background-color: #333333;
+    color: white;
+  }
+  .home-page .btn-primary {
+    background-color: #F49D37;
+    border-color: #F49D37;
+  }
+  .home-page .btn-primary:hover {
+    background-color: #F89C14;
+    border-color: #F89C14;
+  }
+  .home-page .box-header {
+    background-color: #2E056B;
+    font-size: 20px;
+    color: white;
+  }
+  .home-page .box-body {
+    font-size: 18px;
+    color: white;
+  }
+  
+  
   "
+  
+  # Custom CSS to format boxes for analyze page
+  css_analyze <- "
+  	.analyze-page .tab-content .tab-pane {
+    	background-color: #1F1F1F !important;
+    	color: white !important;
+  	}
+  	.analyze-page .box {
+    	background-color: #333333 !important;
+    	border-color: #444444 !important;
+  	}
+  	.analyze-page .box-title {
+    	font-size: 24px !important; /* Larger font size */
+    	font-weight: bold !important; /* Bold text */
+    	color: white !important; /* White text color */
+  	}
+  	.analyze-page .form-control {
+    	background-color: #333333 !important;
+    	color: white !important;
+  	}
+  	.analyze-page .selectize-dropdown {
+    	background-color: #333333 !important;
+    	color: white !important;
+  	}
+  	.analyze-page .selectize-input {
+    	background-color: #333333 !important;
+    	color: white !important;
+  	}
+  	.analyze-page .btn-primary {
+    	background-color: #F49D37 !important;
+    	border-color: #F49D37 !important;
+  	}
+  	.analyze-page .btn-primary:hover {
+    	background-color: #F89C14 !important;
+    	border-color: #F89C14 !important;
+  	}
+  	.analyze-page .box-header {
+    	background-color: #2E056B !important; /* Dark purple background */
+    	color: white !important; /* White text color */
+  	}
+  	.analyze-page .box-body {
+    	font-size: 18px !important; /* Larger font size */
+     	color: white !important;
+  	}
+  
+    "
+  
+  
+  # Graph theme for dark background with custom colors
+  dark_theme <- function() {
+    theme_minimal() +
+      theme(
+        panel.background = element_rect(fill = "#1F1F1F"), # Dark background
+        panel.grid.major = element_line(color = "#505050"), # Dark grid lines
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color = "white"), # White axes
+        axis.text = element_text(color = "white"),
+        axis.title = element_text(color = "white"),
+        plot.background = element_rect(fill = "#1F1F1F"), # White plot background
+        panel.border = element_rect(color = "white", fill = NA), # White plot border
+        legend.text = element_text(color = "white"), # White legend text
+        legend.background = element_rect(fill = "#1F1F1F", color = NA), # White legend background
+        strip.text = element_text(color = "white"), # White strip text
+        plot.title = element_text(color = "white") # White title text
+      )
+  }
 
 
-# Graph theme for dark background with custom colors
-grafana_colors <- c("#F49D37", "#1388A2", "#FF5983", "#6F257F", "#51D6AB")
-dark_theme <- function() {
-  theme_minimal() +
-    theme(
-      panel.background = element_rect(fill = "#1F1F1F"), # Dark background
-      panel.grid.major = element_line(color = "#505050"), # Dark grid lines
-      panel.grid.minor = element_blank(),
-      axis.line = element_line(color = "white"), # White axes
-      axis.text = element_text(color = "white"),
-      axis.title = element_text(color = "white"),
-      plot.background = element_rect(fill = "#1F1F1F"), # White plot background
-      panel.border = element_rect(color = "white", fill = NA), # White plot border
-      legend.text = element_text(color = "white"), # White legend text
-      legend.background = element_rect(fill = "#1F1F1F", color = NA), # White legend background
-      strip.text = element_text(color = "white"), # White strip text
-      plot.title = element_text(color = "white") # White title text
+
+
+  
+
+# ---- Change Home/Help ----
+  
+#Finally, below are the "box" systems for the home and help page of your site, customize them, changing the text and images
+# to suit your sites needs
+home_tab_boxes <- fluidPage(
+  setBackgroundImage(
+    src = "https://images.unsplash.com/photo-1600187230702-5f07aea6d7f2?q=80&w=2612&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    shinydashboard = TRUE
+  ),
+  fluidRow(
+    column(width = 12,
+           box(
+             title = "Our Purpose",
+             width = NULL,
+             HTML("In the Greater Cincinnati Area, the air can be good or bad, and it affects the people living there.
+                     	This dashboard helps people in Cincinnati know how clean or dirty the air is every day.
+                     	It has a map and some other tools to help people see how the air around them is changing.<br><br>
+                     	Made by Re:Newport, Databloom, and the NKU Math Department")
+           )
     )
+  ),
+  fluidRow(
+    column(width = 12,
+           box(
+             title = "A Guide to AQI",
+             width = NULL,
+             HTML("The Air Quality Index (AQI) was created by the Environmental Protection Agency to tell people how clean or dirty the air is.
+                     	It shows if five major pollutants (ground-level ozone, fine particles, carbon monoxide, sulfur dioxide, and nitrogen dioxide) are at levels that could be bad for our health.<br><br>",
+                  HTML('<img src="https://www.csueastbay.edu/airquality/files/images/epa_aqi_2.JPG" style="width:75%;height:auto;">')
+             )
+           )
+    )
+  ),
+  fluidRow(
+    column(width = 12,
+           box(
+             title = "Our Map Varies because Sensors Vary",
+             width = NULL,
+             HTML("The amount of pollution in cities can be very different depending on the area.
+                          	The devices that measure pollution are put in different places, so they show different results depending on their surroundings.<br><br>
+                          	<strong>Industry</strong><br>
+                          	In industrial areas, things like diesel trucks stopping or driving through, machines burning fuel, and using more oil can make the pollution much worse.
+                          	However, there are rules to control this pollution, and it should go away over time.<br><br>
+                          	<strong>Traffic</strong><br>
+                          	Cars cause pollution from their exhaust and from their tires wearing out and brakes being used.
+                          	This makes pollution higher near roads and traffic.
+                          	There are also daily spikes in pollution readings in the mornings and evenings because of people traveling to and from work and school.<br><br>
+                          	<strong>Weather</strong><br>
+                          	Weather can trap pollution and carry it to other places, even very far away.
+                          	It can also move wildfire smoke over long distances.<br><br>
+                          	<strong>Other Spikes</strong><br>
+                          	Sometimes, pollution monitors show very high readings for no clear reason.
+                          	This can happen because of things like spiderwebs, bad sensor placement, or sensor breakdowns.
+                          	Since we can't test the sensors ourselves, we try to ignore data that doesn't make sense."
+             )
+           )
+    )
+  ),
+  fluidRow(
+    column(width = 12,
+           box(
+             title = "Local Reporting",
+             width = NULL,
+             HTML("The following websites are local research and news sources reporting on the state of air quality and the environment in the Greater Cincinnati Area.<br><br>"),
+             HTML('<a href="https://www.cincinnati.com/search/?q=Air+Quality" target="_blank">Cincinnati Enquirer - Air Quality</a><br>'),
+             HTML('<a href="https://greenumbrella.org/" target="_blank">Green Umbrella</a><br>'),
+             HTML('<a href="https://helptheair.org/" target="_blank">Kentuckiana Air Education</a>')
+           )
+    )
+  ),
+  fluidRow(
+    box(
+      title = "Current Articles",
+      width = 12,
+      solidHeader = TRUE,
+      tags$head(
+        tags$style(HTML("
+                    	.article-box {
+                      	border: 1px solid #ddd;
+                      	padding: 10px;
+                      	margin-bottom: 10px;
+                      	display: flex;
+                      	align-items: flex-start;
+                      	flex-direction: column;
+                    	}
+                  	"))
+      ),
+      uiOutput("feed_output")
+    )
+  ),
+  fluidRow(
+    column(width = 12,
+           box(
+             title = "Notifications",
+             width = NULL,
+             "Pull emails"
+           )
+    )
+  )
+)  
+  
+  
+help_tab_boxes <- fluidPage(
+  fluidRow(
+    column(width = 12,
+           box(
+             title = "How do I use the map?",
+             width = NULL,
+             collapsible = TRUE,
+             collapsed = TRUE,
+             HTML("The map tab shows different dots, each one is a sensor.
+                 Circles are PurpleAir sensors, and stars are sensors from the Environmental Protection Agency.
+                 If you tap on a dot, you can see a graph of the data from that sensor.
+                 There is a legend in the bottom right corner.
+                 You can use the drop-down menu next to it to switch between different types of data collected."
+             )
+           )
+    )
+  ),
+  fluidRow(
+    column(width = 12,
+           box(
+             title = "How do I use the analyze feature?",
+             width = NULL,
+             collapsible = TRUE,
+             collapsed = TRUE,
+             "The analyze tab has a graph and a calendar. Both show data from the last sensor the user clicked on the map.
+                 Users can choose what kind of data to see and the time range for the graph and calendar."
+           )
+    )
+  ),
+  fluidRow(
+    column(width = 12,
+           box(
+             title = "How do I use the compare feature?",
+             width = NULL,
+             collapsible = TRUE,
+             collapsed = TRUE,
+             "The compare tab has a map where users can pick sensors to compare.
+                 They can put the sensors into one of two lists. On the right, users can see these lists and change the type of data shown.
+                 Below, the graphs that the user wants to compare are displayed."
+           )
+    )
+  ),
+  fluidRow(
+    column(width = 12,
+           box(
+             title = "What are the see-through lines on the graph?",
+             width = NULL,
+             collapsible = TRUE,
+             collapsed = TRUE,
+             "Each sensor has two parts, called a and b, that measure data together.
+                 Their data is averaged to give the final result.
+                 The see-through lines on the graph show the data from the a and b parts separately.
+                 This helps users see what is being averaged or find problems with the sensors."
+           )
+    )
+  ),
+  fluidRow(
+    column(width = 12,
+           box(
+             title = "How should I place my PurpleAir sensor?",
+             width = NULL,
+             collapsible = TRUE,
+             collapsed = TRUE,
+             HTML("<ul>
+                   <li>Sunlight: Direct sunlight can change a sensor's temperature readings and fade the color of the sensor's exterior.
+                   This is normal, but it's best to keep sensors out of direct sunlight when you place them.</li>
+                   <li>Polluters: Sensors should be placed away from vents, furnaces, and BBQs.
+                   These things can make the sensor's pollution readings incorrect.</li>
+                   <li>Foliage: Spiders and insects like the warmth of sensors and can get into the fans, causing data spikes.
+                   It's best to place sensors away from trees and bushes when possible.</li>
+                   <li>Elevation: The sensor should be placed at a convenient height.
+                   Make sure it is high enough for good airflow and to stay dry from splashing water.</li>
+                   <li>The following picture is an example of a well placed sensor.</li>"),
+             HTML('<img src="https://www.minneapolismn.gov/media/-www-content-assets/images/PurpleAir-Sensor.jpg" style="width:50%;height:auto;">')
+           )
+    )
+  ),
+  fluidRow(
+    column(width = 12,
+           box(
+             title = "Who can I contact for help?",
+             width = NULL,
+             collapsible = TRUE,
+             collapsed = TRUE,
+             HTML("Re:Newport Contact")
+           )
+    )
+  )
+)
+  
+  
+
+# ---- Configuration Ends here ----
+
+# ----Other Setup----
+
+
+
+
+# Function to query data from a database within a specified date range and optional sensor index
+query_data <- function(start_date, end_date, sensor_index = NULL, params = c("name", "time_stamp", "source", "sensor_index", "latitude", "longitude", "humidity", "temperature", "pressure", "\"pm2.5_aqi_dashboard\"", "\"pm2.5_dashboard\"", "\"pm2.5_aqi_a_dashboard\"", "\"pm2.5_aqi_b_dashboard\"")) {
+
+# Convert dates to numeric format (POSIXct to numeric)
+start_date <- as.numeric(start_date)
+end_date <- as.numeric(end_date)
+
+# Connect to the SQLite database (modify the connection string for your database)
+con <- dbConnect(RSQLite::SQLite(), PathToDB)
+
+# Construct the base SQL query
+base_query <- paste("SELECT ", paste(params, collapse = ", "), " FROM df_all WHERE time_stamp BETWEEN '", start_date, "' AND '", end_date, "'", sep="")
+
+# Add sensor_index condition to the query if provided
+if (!is.null(sensor_index)) {
+  base_query <- paste(base_query, "AND sensor_index =", sensor_index)
 }
+
+# Execute the SQL query
+result <- dbGetQuery(con, base_query)
+
+# Disconnect from the database
+dbDisconnect(con)
+
+# Convert columns to appropriate formats
+result$time_stamp <- as.POSIXct(result$time_stamp, origin = "1970-01-01", tz = "UTC")
+
+
+tryCatch(
+  {
+    result$temperature <- ceiling(as.numeric(result$temperature))
+    result$humidity <- ceiling(as.numeric(result$humidity))
+    result$pressure <- ceiling(as.numeric(result$pressure))
+    
+    
+    # Rename columns for better readability
+    result <- result %>%
+      rename("Temperature Fahrenheit" = temperature) %>%
+      rename("Humidity" = humidity) %>%
+      rename("Pressure" = pressure) %>%
+      rename("Date" = time_stamp) %>%
+      rename("Air Quality Index" = pm2.5_aqi_dashboard)
+  }
+)
+
+
+# Add a suffix to the name column based on the source
+result$name <- paste(result$name, if_else(result$source == "PurpleAir", "PA", "EPA"))
+
+# Add a new column for date only (without time)
+result$Date_Only <- as.Date(result$Date)
+
+return(result)
+}
+
+# Function to calculate Air Quality Index (AQI) for PM2.5
+calculate_aqi_pm25 <- function(pm25) {
+# Define breakpoints for AQI calculation
+breakpoints <- data.frame(
+  C_low = c(0, 12.1, 35.5, 55.5, 150.5, 250.5, 350.5),
+  C_high = c(12, 35.4, 55.4, 150.4, 250.4, 350.4, 500.4),
+  AQI_low = c(0, 51, 101, 151, 201, 301, 401),
+  AQI_high = c(50, 100, 150, 200, 300, 400, 500)
+)
+
+# Find the appropriate AQI rank for the given PM2.5 value
+rank <- which(pm25 <= breakpoints$C_high)[1]
+
+# Calculate the AQI based on the breakpoints
+aqi <- ceiling((breakpoints$AQI_high[rank] - breakpoints$AQI_low[rank]) /
+                 (breakpoints$C_high[rank] - breakpoints$C_low[rank]) *
+                 (pm25 - breakpoints$C_low[rank]) + breakpoints$AQI_low[rank])
+
+return(aqi)
+}
+
+getSensorDataDB <- function()
+{
+# Query data from the past 40 days and process it
+SensorDataDB <- query_data(Sys.time() - days(40), Sys.time(), NULL) %>%
+  arrange(sensor_index, desc(Date)) %>%
+  filter(!is.na(!!sym(PrimaryField))) %>%
+  group_by(sensor_index) %>%
+  slice(1) %>%
+  ungroup()
+
+return(SensorDataDB)
+}
+
+# Query historical data from the past 40 days
+getSensorDataDBHistorical <- function()
+{
+SensorDataDBHistorical <- query_data(Sys.time() - days(40), Sys.time(), NULL)
+return(SensorDataDBHistorical)
+}
+
+
+
+
+
+
+
+
+
+
 
 # ---- UI ----
 ui <- dashboardPage(
-  skin = "purple",
+  skin = ThemeColor,
   dashboardHeader(title = "Air Quality Dashboard"),
   dashboardSidebar(
     sidebarMenu(
       id = "tabs",
       HTML(paste0(
         "<br>",
-        "<a href='https://dxbhsrqyrr690.cloudfront.net/sidearm.nextgen.sites/nkunorse.com/images/responsive/logo_main.svg' target='_blank'><img style = 'display: block; margin-left: auto; margin-right: auto;' src='https://dxbhsrqyrr690.cloudfront.net/sidearm.nextgen.sites/nkunorse.com/images/responsive/logo_main.svg' width = '186'></a>",
+        "<a href='", target_link, "' target='_blank'><img style='display: block; margin-left: auto; margin-right: auto;' src='", logo_link, "' width='186'></a>",
         "<br>"
       )),
       menuItem("Home", tabName = "home", icon = icon("home")),
@@ -441,93 +752,7 @@ ui <- dashboardPage(
       
       
       tabItem(tabName = "help", class = "home-page",
-              fluidRow(
-                column(width = 12,
-                       box(
-                         title = "How do I use the map?",
-                         width = NULL,
-                         collapsible = TRUE,
-                         collapsed = TRUE,
-                         HTML("The map tab shows different dots, each one is a sensor.
-               	Circles are PurpleAir sensors, and stars are sensors from the Environmental Protection Agency.
-               	If you tap on a dot, you can see a graph of the data from that sensor.
-               	There is a legend in the bottom right corner.
-               	You can use the drop-down menu next to it to switch between different types of data collected."
-                         )
-                       )
-                )
-              ),
-              fluidRow(
-                column(width = 12,
-                       box(
-                         title = "How do I use the analyze feature?",
-                         width = NULL,
-                         collapsible = TRUE,
-                         collapsed = TRUE,
-                         "The analyze tab has a graph and a calendar. Both show data from the last sensor the user clicked on the map.
-               	Users can choose what kind of data to see and the time range for the graph and calendar."
-                       )
-                )
-              ),
-              fluidRow(
-                column(width = 12,
-                       box(
-                         title = "How do I use the compare feature?",
-                         width = NULL,
-                         collapsible = TRUE,
-                         collapsed = TRUE,
-                         "The compare tab has a map where users can pick sensors to compare.
-               	They can put the sensors into one of two lists. On the right, users can see these lists and change the type of data shown.
-               	Below, the graphs that the user wants to compare are displayed."
-                       )
-                )
-              ),
-              fluidRow(
-                column(width = 12,
-                       box(
-                         title = "What are the see-through lines on the graph?",
-                         width = NULL,
-                         collapsible = TRUE,
-                         collapsed = TRUE,
-                         "Each sensor has two parts, called a and b, that measure data together.
-               	Their data is averaged to give the final result.
-               	The see-through lines on the graph show the data from the a and b parts separately.
-               	This helps users see what is being averaged or find problems with the sensors."
-                       )
-                )
-              ),
-              fluidRow(
-                column(width = 12,
-                       box(
-                         title = "How should I place my PurpleAir sensor?",
-                         width = NULL,
-                         collapsible = TRUE,
-                         collapsed = TRUE,
-                         HTML("<ul>
-                    	<li>Sunlight: Direct sunlight can change a sensor's temperature readings and fade the color of the sensor's exterior.
-                    	This is normal, but it's best to keep sensors out of direct sunlight when you place them.</li>
-                    	<li>Polluters: Sensors should be placed away from vents, furnaces, and BBQs.
-                    	These things can make the sensor's pollution readings incorrect.</li>
-                    	<li>Foliage: Spiders and insects like the warmth of sensors and can get into the fans, causing data spikes.
-                    	It's best to place sensors away from trees and bushes when possible.</li>
-                    	<li>Elevation: The sensor should be placed at a convenient height.
-                    	Make sure it is high enough for good airflow and to stay dry from splashing water.</li>
-                    	<li>The following picture is an example of a well placed sensor.</li>"),
-                         HTML('<img src="https://www.minneapolismn.gov/media/-www-content-assets/images/PurpleAir-Sensor.jpg" style="width:50%;height:auto;">')
-                       )
-                )
-              ),
-              fluidRow(
-                column(width = 12,
-                       box(
-                         title = "Who can I contact for help?",
-                         width = NULL,
-                         collapsible = TRUE,
-                         collapsed = TRUE,
-                         HTML("Re:Newport Contact")
-                       )
-                )
-              )
+              help_tab_boxes
       ),
       
       
@@ -536,100 +761,7 @@ ui <- dashboardPage(
       
       tabItem(tabName = "home", class = "home-page",
               condition = "input.tab === 'home'",
-              setBackgroundImage(
-                src = "https://images.unsplash.com/photo-1600187230702-5f07aea6d7f2?q=80&w=2612&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-                shinydashboard = TRUE
-              ),
-              fluidRow(
-                column(width = 12,
-                       box(
-                         title = "Our Purpose",
-                         width = NULL,
-                         HTML("In the Greater Cincinnati Area, the air can be good or bad, and it affects the people living there.
-                     	This dashboard helps people in Cincinnati know how clean or dirty the air is every day.
-                     	It has a map and some other tools to help people see how the air around them is changing.<br><br>
-                     	Made by Re:Newport, Databloom, and the NKU Math Department")
-                       )
-                )
-              ),
-              fluidRow(
-                column(width = 12,
-                       box(
-                         title = "A Guide to AQI",
-                         width = NULL,
-                         HTML("The Air Quality Index (AQI) was created by the Environmental Protection Agency to tell people how clean or dirty the air is.
-                     	It shows if five major pollutants (ground-level ozone, fine particles, carbon monoxide, sulfur dioxide, and nitrogen dioxide) are at levels that could be bad for our health.<br><br>",
-                              HTML('<img src="https://www.csueastbay.edu/airquality/files/images/epa_aqi_2.JPG" style="width:75%;height:auto;">')
-                         )
-                       )
-                )
-              ),
-              fluidRow(
-                column(width = 12,
-                       box(
-                         title = "Our Map Varies because Sensors Vary",
-                         width = NULL,
-                         HTML("The amount of pollution in cities can be very different depending on the area.
-                          	The devices that measure pollution are put in different places, so they show different results depending on their surroundings.<br><br>
-                          	<strong>Industry</strong><br>
-                          	In industrial areas, things like diesel trucks stopping or driving through, machines burning fuel, and using more oil can make the pollution much worse.
-                          	However, there are rules to control this pollution, and it should go away over time.<br><br>
-                          	<strong>Traffic</strong><br>
-                          	Cars cause pollution from their exhaust and from their tires wearing out and brakes being used.
-                          	This makes pollution higher near roads and traffic.
-                          	There are also daily spikes in pollution readings in the mornings and evenings because of people traveling to and from work and school.<br><br>
-                          	<strong>Weather</strong><br>
-                          	Weather can trap pollution and carry it to other places, even very far away.
-                          	It can also move wildfire smoke over long distances.<br><br>
-                          	<strong>Other Spikes</strong><br>
-                          	Sometimes, pollution monitors show very high readings for no clear reason.
-                          	This can happen because of things like spiderwebs, bad sensor placement, or sensor breakdowns.
-                          	Since we can't test the sensors ourselves, we try to ignore data that doesn't make sense."
-                         )
-                       )
-                )
-              ),
-              fluidRow(
-                column(width = 12,
-                       box(
-                         title = "Local Reporting",
-                         width = NULL,
-                         HTML("The following websites are local research and news sources reporting on the state of air quality and the environment in the Greater Cincinnati Area.<br><br>"),
-                         HTML('<a href="https://www.cincinnati.com/search/?q=Air+Quality" target="_blank">Cincinnati Enquirer - Air Quality</a><br>'),
-                         HTML('<a href="https://greenumbrella.org/" target="_blank">Green Umbrella</a><br>'),
-                         HTML('<a href="https://helptheair.org/" target="_blank">Kentuckiana Air Education</a>')
-                       )
-                )
-              ),
-              fluidRow(
-                box(
-                  title = "Current Articles",
-                  width = 12,
-                  solidHeader = TRUE,
-                  tags$head(
-                    tags$style(HTML("
-                    	.article-box {
-                      	border: 1px solid #ddd;
-                      	padding: 10px;
-                      	margin-bottom: 10px;
-                      	display: flex;
-                      	align-items: flex-start;
-                      	flex-direction: column;
-                    	}
-                  	"))
-                  ),
-                  uiOutput("feed_output")
-                )
-              ),
-              fluidRow(
-                column(width = 12,
-                       box(
-                         title = "Notifications",
-                         width = NULL,
-                         "Pull emails"
-                       )
-                )
-              )
+              home_tab_boxes
       ),
       
       tabItem(tabName = "map",
@@ -655,7 +787,7 @@ ui <- dashboardPage(
                 tags$div(
                   selectInput("variable_select_input_map", "",
                               choices = getVarList(),
-                              selected = "Air_Quality_Index"),
+                              selected = getVarList()[1]),
                   style = "width: 240px; position: fixed; bottom: 160px; right: 10px;"
                 )
               )
@@ -671,17 +803,17 @@ ui <- dashboardPage(
                          solidHeader = TRUE,
                          #status = "primary",
                          div(
-                         "The two following graphs are here to visualize the Air Quality Index, which comprises of the density of pollutants of a certain size currently in the air. Anything above moderate is cause for concern. The first graph shows the current air quality as time ranges, and the second graph gives the daily average and shows it on a calendar.",
-                         br(),
-                         br(),
-                         selectInput("sensor_dropdown", "Select a Sensor",
-                                      choices = NULL,  # Initially, no choices are set
-                                      selected = NULL,
-                                      selectize = TRUE,  # Makes it scrollable and searchable
-                                      multiple = FALSE)
+                           "The two following graphs are here to visualize the Air Quality Index, which comprises of the density of pollutants of a certain size currently in the air. Anything above moderate is cause for concern. The first graph shows the current air quality as time ranges, and the second graph gives the daily average and shows it on a calendar.",
+                           br(),
+                           br(),
+                           selectInput("sensor_dropdown", "Select a Sensor",
+                                       choices = NULL,  # Initially, no choices are set
+                                       selected = NULL,
+                                       selectize = TRUE,  # Makes it scrollable and searchable
+                                       multiple = FALSE)
                          )
-                        )
- 
+                       )
+                       
                 )
               ),
               fluidRow(
@@ -700,7 +832,7 @@ ui <- dashboardPage(
                            column(width = 6,
                                   selectInput("variable_select_input_line_graph_analyze", "Select Graph Variables",
                                               choices = getVarList(),
-                                              selected = "Air_Quality_Index")
+                                              selected = getVarList()[1])
                            ),
                            column(width = 6,
                                   selectInput("time_select_input_line_graph_analyze", "Select Time Input",
@@ -746,7 +878,7 @@ ui <- dashboardPage(
                            column(width = 6,
                                   selectInput("variable_select_input_line_calendar_analyze", "Select Calendar Variable",
                                               choices = getVarList(),
-                                              selected = "Air_Quality_Index")
+                                              selected = getVarList()[1])
                            ),
                            column(width = 6,
                                   selectInput("time_select_input_line_calendar_analyze", "Select Calendar Type",
@@ -788,7 +920,7 @@ ui <- dashboardPage(
                           width = NULL,
                           selectInput("variable_select_compare", "Variable",
                                       choices = getVarList(),
-                                      selected = "Air_Quality_Index"),
+                                      selected = getVarList()[1]),
                           selectInput("time_select_input_line_graph_compare", "Select Time Input",
                                       choices = c("1 day", "7 days","30 days","90 days","365 days","custom range"),
                                       selected = "30 days"),
@@ -853,7 +985,7 @@ ui <- dashboardPage(
 server <- function(input, output, session) {
   
   #function to create a custom star image of the chosen color
-  generate_star_svg <- function(hex_color, size = 20, move_up = 0, num_sides = 5) {
+  generate_star_svg <- function(hex_color = "Green", size = 20, move_up = 0, num_sides = 5) {
     # Function to calculate the coordinates of the points
     calculate_points <- function(cx, cy, r, num_sides) {
       points <- ""
@@ -869,7 +1001,6 @@ server <- function(input, output, session) {
     
     # Calculate points for the star
     points <- calculate_points(12, 12, 10, num_sides)
-    
     # Generate the SVG string
     svg_string <- sprintf(
       '<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 24 24" fill="%s">
@@ -878,12 +1009,13 @@ server <- function(input, output, session) {
       size, size, hex_color, points
     )
     
+    
     svg_data_uri <- paste0("data:image/svg+xml;base64,", base64encode(charToRaw(svg_string)))
     
     return(svg_data_uri)
     
   }
-
+  
   
   # ---- Maps ----
   
@@ -926,7 +1058,7 @@ server <- function(input, output, session) {
   
   # Filter SensorDataDB for non-NA values in the "Air_Quality_Index" column
   FilteredSensorDataDB <- getSensorDataDB() %>%
-    filter(!is.na(.[["Air_Quality_Index"]]))
+    filter(!is.na(.[[PrimaryField]]))
   
   
   # Function to generate a heatmap based on the selected variable
@@ -942,16 +1074,37 @@ server <- function(input, output, session) {
     # Define a grid of points for interpolation
     x_range <- range(d$x) + c(-0.1, 0.1)
     y_range <- range(d$y) + c(-0.1, 0.1)
-    n_points <- 500
+    n_points <- 100
     grid_x <- seq(min(x_range), max(x_range), length.out = n_points)
     grid_y <- seq(min(y_range), max(y_range), length.out = n_points)
     grid_points <- expand.grid(x = grid_x, y = grid_y)
     
     # Create and perform IDW interpolation on the grid
-    gs <- gstat(formula = z ~ 1, locations = ~x + y, data = d, nmax = Inf, set = list(idp = 5))
-    idw_raster <- predict(gs, newdata = grid_points)
-    idw_grid <- as.data.frame(idw_raster)
-    colnames(idw_grid) <- c("x", "y", "z")
+    
+    if(UseCustomIDW == FALSE)
+    {
+      #This is a version done with a built in library, got replaced by a custom solution found at the top of the code
+      gs <- gstat(formula = z ~ 1, locations = ~x + y, data = d, nmax = Inf, set = list(idp = 5))
+      idw_raster <- predict(gs, newdata = grid_points)
+      idw_grid <- as.data.frame(idw_raster)
+      colnames(idw_grid) <- c("x", "y", "z")
+    }
+    else
+    {
+      interpolated_values <- interpolate(d, grid_points)
+      idw_grid <- cbind(grid_points, z = interpolated_values)
+      colnames(idw_grid) <- c("x", "y", "z")
+      coordinates(idw_grid) <- ~x + y
+      gridded(idw_grid) <- TRUE
+      
+      idw_raster <- raster(idw_grid)
+      
+      # Plot the raster
+      plot(idw_raster, main = "Variogram-based IDW Interpolation")
+      
+    }
+    
+
     
     # Cap the maximum value of z
     background_bars <- getBackgroundBarsTemplate(var)
@@ -971,10 +1124,10 @@ server <- function(input, output, session) {
     
     return(RasterPlot)
   }
-
+  
   # Function to generate a color palette for the heatmap
   getHeatmapColor <- function(var){
-    if(var == "Air_Quality_Index")
+    if(var == "Air Quality Index")
     {
       custom_colors <- c("green", "yellow", "orange", "red", "purple", "purple", "#7E0023", "#7E0023", "#7E0023", "#7E0023")
       pal <- colorNumeric(palette = custom_colors, domain = c(0, 500))
@@ -1081,18 +1234,22 @@ server <- function(input, output, session) {
         data = EPA_data,
         lng = ~longitude,
         lat = ~latitude,
-        icon = icons(
-          iconUrl = lapply(1:nrow(EPA_data), function(i) {
-            source <- EPA_data$source[i]
-            hex_color <- getColor(EPA_data[[input$variable_select_input_map]], input$variable_select_input_map)
-            num_sides <- SourceToShapeMapper[[source]]
-            generate_star_svg(hex_color, size = 50, num_sides = num_sides)
-          }),
-          iconWidth = 50, iconHeight = 50
-        )
-        
-        
-        
+        icon = tryCatch({
+          icons(
+            iconUrl = lapply(1:nrow(EPA_data), function(i) {
+              source <- EPA_data$source[i]
+              #print(EPA_data[[input$variable_select_input_map]])
+              #print(getColor(EPA_data[[input$variable_select_input_map]], input$variable_select_input_map))
+              hex_color <- getColor(EPA_data[[input$variable_select_input_map]], input$variable_select_input_map)
+              num_sides <- SourceToShapeMapper[[source]]
+              generate_star_svg(hex_color[i], size = 50, num_sides = num_sides)
+            }),
+            iconWidth = 50, iconHeight = 50
+          )
+        }, error = function(e) {
+          return(NULL)
+        })
+
       ) %>%
       addLabelOnlyMarkers(
         data = FilteredSensorDataDB,
@@ -1112,9 +1269,9 @@ server <- function(input, output, session) {
       ) %>%
       addLegend(
         position = "bottomright",
-        colors = getBackgroundBarsTemplate(input$variable_select_input_map)$fill,
-        labels = getBackgroundBarsTemplate(input$variable_select_input_map)$label,
-        title = "Air Quality Index"
+        colors = rev(getBackgroundBarsTemplate(input$variable_select_input_map)$fill),
+        labels = rev(getBackgroundBarsTemplate(input$variable_select_input_map)$label),
+        title = getBackgroundBarsTemplate(input$variable_select_input_map)$var[1]
       )
   })
   
@@ -1178,7 +1335,7 @@ server <- function(input, output, session) {
   
   
   #Adding select sensor dropdown event that changes the analyze tab
-
+  
   observeEvent(input$sensor_dropdown, {
     CurrentMapSensorId(getSensorDataDB()$sensor_index[getSensorDataDB()$name == input$sensor_dropdown])
     print(CurrentMapSensorId())
@@ -1188,7 +1345,7 @@ server <- function(input, output, session) {
   
   # ---- Analyze Graph ----
   output$Line_Graph_Analyze <- renderGirafe({
-
+    
     # Check if the custom date range is selected and not null
     if (input$time_select_input_line_graph_analyze == "custom range" && !is.null(input$custom_date_range)) {
       start_date <- input$custom_date_range[1]
@@ -1265,7 +1422,7 @@ server <- function(input, output, session) {
     p <- ggplot()
     
     # Special handling for PurpleAir source with Air Quality Index variable
-    if(first(background_bars$var) == "Air_Quality_Index" & first(dataset$source) == "PurpleAir") {
+    if(first(background_bars$var) == "Air Quality Index" & first(dataset$source) == "PurpleAir") {
       
       # Subset the dataset to remove NA values for pm2.5_60minute_a
       dataset <- subset(dataset, !is.na(pm2.5_aqi_a_dashboard))
@@ -1506,8 +1663,8 @@ server <- function(input, output, session) {
         days.col = "transparent",  # Make day labels transparent
         day.size = 0
       )
-        
-        
+      
+      
       
       # Print the plot
       
@@ -1515,7 +1672,7 @@ server <- function(input, output, session) {
       
       print(p)
     })
-})
+  })
   
   # Function to generate the legend HTML
   generate_legend <- function(text_list, color_list) {
@@ -1542,7 +1699,6 @@ server <- function(input, output, session) {
   
   
   
-  # ---- CompareMap ----
   
   
   # Render the Leaflet map for AQMapCompare
@@ -1578,15 +1734,21 @@ server <- function(input, output, session) {
         lng = ~longitude,
         lat = ~latitude,
         layerId = ~sensor_index,
-        icon = icons(
-          iconUrl = lapply(1:nrow(EPA_data), function(i) {
-            source <- EPA_data$source[i]
-            hex_color <- getColor(EPA_data[[input$variable_select_input_map]], input$variable_select_input_map)
-            num_sides <- SourceToShapeMapper[[source]]
-            generate_star_svg(hex_color, size = 50, num_sides = num_sides)
-          }),
-          iconWidth = 50, iconHeight = 50
-        )) %>%
+        icon = tryCatch({
+          icons(
+            iconUrl = lapply(1:nrow(EPA_data), function(i) {
+              source <- EPA_data$source[i]
+              hex_color <- getColor(EPA_data[[input$variable_select_input_map]], input$variable_select_input_map)
+              num_sides <- SourceToShapeMapper[[source]]
+              generate_star_svg(hex_color[i], size = 50, num_sides = num_sides)
+            }),
+            iconWidth = 50, iconHeight = 50
+          )
+        }, error = function(e) {
+          return(NULL)
+        })
+
+      ) %>%
       addLabelOnlyMarkers(
         lng = ~longitude,
         lat = ~latitude,
@@ -1847,7 +2009,7 @@ server <- function(input, output, session) {
       start_date <- as.POSIXct(Sys.Date() - days(time_input), tz = "UTC")
       end_date <- as.POSIXct(Sys.Date() + 1, tz = "UTC") - seconds(1)
     }
-
+    
     
     dataset <- query_data(start_date, end_date, NULL)
     

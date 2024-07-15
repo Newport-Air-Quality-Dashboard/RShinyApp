@@ -1,29 +1,9 @@
 # To Do FINAL
 
-Make all the text changes requested
-
 Live database connection for deployed app (include some kind of visual to show how all tools, scrips, and other components interact)
 
 Don't know what IDW scheme you're using, but we'll want to make that configurable. See example below, based on the variogram.
 
-Change Graph time from 40 days back to 3
-
-do variogram
-
-make compare locations more intuitive
-
-config file to my app
-
-add a legend for the markers
-
-
-
-
-On the Air Quality Map Tab
--instead of "Current Air Quality Index" as the title, refer to the time period you're graphing, it looks like the past 48 hours maybe? "Current" suggests only a right-now reading to my mind.
--for the AQI legend, flip the order so it reads the same way the graphs read (with good on the bottom)
--Add an axis label for the y-axis
--In that same vein, eventually clean up those to look less code-like, no underscores, switch (f) to Farenheit spelled out
 
 
 
