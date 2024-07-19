@@ -48,19 +48,22 @@ PathToDB <- "db.sqlite"
 #Note, unless you are using the database that is provided in this project, the field name "Air_Quality_Index" is not recommended
 
 #Below change the list of parameters you plan to use from your sql database
-Sql_Params <- c("name", "time_stamp", "source", "sensor_index", "latitude", "longitude", "humidity", "temperature", "pressure", "\"pm2.5_aqi_dashboard\"", "\"pm2.5_dashboard\"", "\"pm2.5_aqi_a_dashboard\"", "\"pm2.5_aqi_b_dashboard\"")
+Sql_Params <- c("name", "time_stamp", "source", "sensor_index", "latitude", "longitude", "humidity_dashboard", "temperature_dashboard", "pressure_dashboard", "\"pm2.5_aqi_dashboard\"", "\"pm2.5_dashboard\"", "\"pm2.5_a_dashboard\"", "\"pm2.5_b_dashboard\"")
 
 #Now here, outline the names of parameters you want to be displayed on the map in a dropdown
 getVarList <- function() {
   return(c("Air Quality Index", "Temperature Fahrenheit", "Pressure", "Humidity"))
 }
 
-#Also define which field is the primary one, this will filter all NA's in this field for all the data
+#Also define which field is the primary one, this will filter all NA's in this field for all the data (Note to future contributors: may be worth making a system that does not universally filter this)
 PrimaryField <- "Air Quality Index"
 
 # For each of the parameters you have chosen, replace the numbers and colors below with whatever you want to make a
 # custom range for what the colors are defined as
 
+PastDaysLimit <- 7
+#Amount of days from now that the map graph goes back to
+#Also defines how long ago a value needs to appear for a sensor to be considered "active" and show up on the map
 
 getColor <- function(var, inputVar) {
   if (inputVar == "Air Quality Index") {
@@ -201,7 +204,6 @@ interpolate <- function(d, grid_points) {
 }
 
 #There is an option to have people sign up for phone notifications, but it rquires the paid service "nexmo", here you can set that up
-#---- yesy ----
 
 SMSTimer <- 300 #define time beetween notifications in seconds
 
@@ -570,7 +572,7 @@ help_tab_boxes <- fluidPage(
 
 
 # Function to query data from a database within a specified date range and optional sensor index
-query_data <- function(start_date, end_date, sensor_index = NULL, params = c("name", "time_stamp", "source", "sensor_index", "latitude", "longitude", "humidity", "temperature", "pressure", "\"pm2.5_aqi_dashboard\"", "\"pm2.5_dashboard\"", "\"pm2.5_aqi_a_dashboard\"", "\"pm2.5_aqi_b_dashboard\"")) {
+query_data <- function(start_date, end_date, sensor_index = NULL, params = Sql_Params) {
   
   # Convert dates to numeric format (POSIXct to numeric)
   start_date <- as.numeric(start_date)
@@ -599,16 +601,16 @@ query_data <- function(start_date, end_date, sensor_index = NULL, params = c("na
   
   tryCatch(
     {
-      result$temperature <- ceiling(as.numeric(result$temperature))
-      result$humidity <- ceiling(as.numeric(result$humidity))
-      result$pressure <- ceiling(as.numeric(result$pressure))
+      result$temperature_dashboard <- ceiling(as.numeric(result$temperature_dashboard))
+      result$humidity_dashboard <- ceiling(as.numeric(result$humidity_dashboard))
+      result$pressure_dashboard <- ceiling(as.numeric(result$pressure_dashboard))
       
       
       # Rename columns for better readability
       result <- result %>%
-        rename("Temperature Fahrenheit" = temperature) %>%
-        rename("Humidity" = humidity) %>%
-        rename("Pressure" = pressure) %>%
+        rename("Temperature Fahrenheit" = temperature_dashboard) %>%
+        rename("Humidity" = humidity_dashboard) %>%
+        rename("Pressure" = pressure_dashboard) %>%
         rename("Date" = time_stamp) %>%
         rename("Air Quality Index" = pm2.5_aqi_dashboard)
     }
@@ -645,29 +647,27 @@ calculate_aqi_pm25 <- function(pm25) {
   return(aqi)
 }
 
-getSensorDataDB <- function()
-{
-  # Query data from the past 40 days and process it
-  SensorDataDB <- query_data(Sys.time() - days(40), Sys.time(), NULL) %>%
-    arrange(sensor_index, desc(Date)) %>%
-    filter(!is.na(!!sym(PrimaryField))) %>%
-    group_by(sensor_index) %>%
-    slice(1) %>%
-    ungroup()
-  
-  return(SensorDataDB)
-}
+
+
+getSensorDataDB <- reactive({
+    # Query data from the past 40 days and process it
+    SensorDataDB <- query_data(Sys.time() - days(PastDaysLimit), Sys.time(), NULL) %>%
+      arrange(sensor_index, desc(Date)) %>%
+      filter(!is.na(!!sym(PrimaryField))) %>%
+      group_by(sensor_index) %>%
+      slice(1) %>%
+      ungroup()
+  #return(SensorDataDB)
+})
+
+
+
 
 # Query historical data from the past 40 days
-getSensorDataDBHistorical <- function()
-{
-  SensorDataDBHistorical <- query_data(Sys.time() - days(40), Sys.time(), NULL)
-  return(SensorDataDBHistorical)
-}
-
-
-
-
+getSensorDataDBHistorical <- reactive({
+  query_data(Sys.time() - days(PastDaysLimit), Sys.time(), NULL)
+  #return(SensorDataDBHistorical)
+  })
 
 
 
@@ -1086,8 +1086,8 @@ server <- function(input, output, session) {
   outputOptions(output, "draggableVisible", suspendWhenHidden = FALSE)
   
   # Filter SensorDataDB for non-NA values in the "Air_Quality_Index" column
-  FilteredSensorDataDB <- getSensorDataDB() %>%
-    filter(!is.na(.[[PrimaryField]]))
+  #FilteredSensorDataDB <- getSensorDataDB() %>%
+  #  filter(!is.na(.[[PrimaryField]]))
   
   
   # Function to generate a heatmap based on the selected variable
@@ -1178,6 +1178,7 @@ server <- function(input, output, session) {
   
   # Function to generate a 24-hour graph for the specified dataset
   twentyFourHourGraph <- function(dataset) {
+    
     CurrentMapSensorId(first(dataset$sensor_index))
     
     #update the choices for when you go to analyze
@@ -1315,8 +1316,9 @@ server <- function(input, output, session) {
     lat_lng_filter_historical <- SensorDataDBHistorical$latitude == hovered_lat & SensorDataDBHistorical$longitude == hovered_lng
     historical_data <- SensorDataDBHistorical[lat_lng_filter_historical, ]
     
-    twentyFourHourGraph(historical_data)
     addMarkerAnimation(marker_data)
+    twentyFourHourGraph(historical_data)
+    
   })
   
   # Observe map zoom level changes and update marker visibility
@@ -1344,8 +1346,8 @@ server <- function(input, output, session) {
     lat_lng_filter_historical <- SensorDataDBHistorical$latitude == hovered_lat & SensorDataDBHistorical$longitude == hovered_lng
     historical_data <- SensorDataDBHistorical[lat_lng_filter_historical, ]
     
-    twentyFourHourGraph(historical_data)
     addMarkerAnimation(marker_data)
+    twentyFourHourGraph(historical_data)
   })
   
   # Handle the event when the graph button is clicked
@@ -1357,10 +1359,7 @@ server <- function(input, output, session) {
     print(CurrentMapSensorId)
   })
   
-  #update the choices at the start of the run
-  updateSelectInput(session, "sensor_dropdown",
-                    choices = getSensorDataDB()$name,
-                    selected = NULL)
+
   
   
   #Adding select sensor dropdown event that changes the analyze tab
@@ -1431,6 +1430,10 @@ server <- function(input, output, session) {
   # Function to generate the graph plot
   GraphPlot <- function(dataset, start_date, end_date, background_bars) {
     
+  
+    
+    
+    print("test1")
     # Filter the dataset based on the date range
     dataset <- dataset[dataset$Date >= start_date & dataset$Date <= end_date, ]
     
@@ -1454,10 +1457,10 @@ server <- function(input, output, session) {
     if(first(background_bars$var) == "Air Quality Index" & first(dataset$source) == "PurpleAir") {
       
       # Subset the dataset to remove NA values for pm2.5_60minute_a
-      dataset <- subset(dataset, !is.na(pm2.5_aqi_a_dashboard))
-      dataset <- subset(dataset, !is.na(pm2.5_aqi_b_dashboard))
-      dataset$Air_Quality_Index_A <- dataset$pm2.5_aqi_a_dashboard #calculate_aqi_pm25(dataset$pm2.5_aqi_a_dashboard)
-      dataset$Air_Quality_Index_B <- dataset$pm2.5_aqi_b_dashboard #calculate_aqi_pm25(dataset$pm2.5_aqi_b_dashboard)
+      dataset <- subset(dataset, !is.na(pm2.5_a_dashboard))
+      dataset <- subset(dataset, !is.na(pm2.5_b_dashboard))
+      dataset$Air_Quality_Index_A <- dataset$pm2.5_a_dashboard #calculate_aqi_pm25(dataset$pm2.5_aqi_a_dashboard)
+      dataset$Air_Quality_Index_B <- dataset$pm2.5_b_dashboard #calculate_aqi_pm25(dataset$pm2.5_aqi_b_dashboard)
       
       # Determine the maximum values for both Air Quality Index A and B
       max_a <- max(dataset$Air_Quality_Index_A, na.rm = TRUE)
