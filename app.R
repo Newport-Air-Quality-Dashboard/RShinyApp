@@ -1244,8 +1244,8 @@ server <- function(input, output, session) {
         options = tileOptions(zIndex = 999) # Ensuring the heatmap is on top
       ) %>%
       
-      addProviderTiles(provider = providers$CartoDB.VoyagerLabelsUnder, group = "Light Theme", options = tileOptions(zIndex = 1)) %>%
-      addProviderTiles(provider = providers$CartoDB.DarkMatter, group = "Dark Theme", options = tileOptions(zIndex = 1)) %>%
+      addProviderTiles(provider = providers$CartoDB.VoyagerLabelsUnder, group = "Light Theme") %>%
+      addProviderTiles(provider = providers$CartoDB.DarkMatter, group = "Dark Theme") %>%
       addLayersControl(
         baseGroups = c("Light Theme", "Dark Theme"),
         options = layersControlOptions(collapsed = FALSE)
@@ -1744,8 +1744,8 @@ server <- function(input, output, session) {
     
     # Create the Leaflet map
     leaflet(FilteredSensorDataDB) %>%
-      addProviderTiles(provider = providers$CartoDB.VoyagerLabelsUnder, group = "Light Theme", options = tileOptions(zIndex = 1)) %>%
-      addProviderTiles(provider = providers$CartoDB.DarkMatter, group = "Dark Theme", options = tileOptions(zIndex = 1)) %>%
+      addProviderTiles(provider = providers$CartoDB.VoyagerLabelsUnder, group = "Light Theme") %>%
+      addProviderTiles(provider = providers$CartoDB.DarkMatter, group = "Dark Theme") %>%
       addLayersControl(
         baseGroups = c("Light Theme", "Dark Theme"),
         options = layersControlOptions(collapsed = FALSE)
