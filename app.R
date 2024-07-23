@@ -61,7 +61,7 @@ PrimaryField <- "Air Quality Index"
 # For each of the parameters you have chosen, replace the numbers and colors below with whatever you want to make a
 # custom range for what the colors are defined as
 
-PastDaysLimit <- 7
+PastDaysLimit <- 30
 #Amount of days from now that the map graph goes back to
 #Also defines how long ago a value needs to appear for a sensor to be considered "active" and show up on the map
 
@@ -151,7 +151,7 @@ InitialMapView <- c(39.0890, -84.5008, 12) #lat, lng, zoom
 #The compare map view has a list of presets that allow you to easily set up comparisons, 
 #put the "name" parameter value for the sensors/points that you want to be in specific presets.
 presets <- list(
-  "Newport East" = c("Monitor 1 East PA","Monitor 12 East PA","Monitor 4 East PA","338 E 9th St Newport KY 41071 PA","home PA"),
+  "Newport East" = c("Monitor 1 East PA","Monitor 4 East PA","338 E 9th St Newport KY 41071 PA","home PA"),
   "Newport West" = c("Monitor 9 West PA","Monitor 7 West PA","Monitor 10 West PA","Monitor 8 West PA","Monitor 6 West PA"),
   "Newport All" = c("Monitor 1 East PA","Monitor 12 East PA","Monitor 4 East PA","338 E 9th St Newport KY 41071 PA","home PA","Monitor 9 West PA","Monitor 7 West PA","Monitor 10 West PA","Monitor 8 West PA","Monitor 6 West PA","Monitor 11 Island PA"),
   "Cincinnati Area" = c("McFarland PA", "Longworth Square PA", "Lower Price Hill EPA", "MSD 6 PA", "Meals on Wheels PA", "Taft NCore PAMS EPA", "CFD Station 12 PA", "City-CHD PA")
@@ -553,10 +553,11 @@ help_tab_boxes <- fluidPage(
              width = NULL,
              collapsible = TRUE,
              collapsed = TRUE,
-             HTML("Josh Tunning at Re:Newport --> tunning.josh@gmail.com<br><br>
+             HTML("Re:Newport --> info@renewportky.com<br><br>
                 Data Bloom --> grow@thedatabloom.com<br><br>
                 Andrew Long: Dashboard Supervisor --> LONGA@nku.edu<br><br>
-                Kristy Hopfensperger: Team Organizer --> hopfenspek1@nku.edu")
+                Kristy Hopfensperger: Team Organizer --> hopfenspek1@nku.edu
+                ")
            )
     )
   )
@@ -622,7 +623,7 @@ query_data <- function(start_date, end_date, sensor_index = NULL, params = Sql_P
   
   # Add a new column for date only (without time)
   result$Date_Only <- as.Date(result$Date)
-  
+  view(result)
   return(result)
 }
 
